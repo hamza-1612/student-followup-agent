@@ -1,0 +1,3 @@
+name: student-followup
+version: "0.1.0"
+description: Read-only student follow-up evidence from a JSON file.
