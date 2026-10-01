@@ -16,8 +16,9 @@ python -m unittest discover -s tests -v
 Use `py` in place of `python` if that is how Python is installed. The analyzer
 needs no Python packages and no API key. On macOS/Linux, use `python3`.
 `python scripts/generate_demo.py` regenerates the same fictional input.
-Errors appear on stderr with exit code 2. Standard output is JSON so it can be
-saved or used by another program.
+Errors appear on stderr with exit code 2. The default output is a concise
+Arabic report listing **all** candidates and unresolved cases. For complete
+machine-readable output, add `--json` to the analysis command.
 
 Expected counts for the included sample: 30 students; 150 dated attendance
 records; 3 review candidates (S-002, S-003, S-006); one unresolved case

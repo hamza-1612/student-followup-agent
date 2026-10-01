@@ -8,11 +8,55 @@ from pathlib import Path
 from .core import DataError, analyze
 
 
+def format_report(result):
+    summary = result["summary"]
+    period = result["period"]
+    lines = [
+        f"متابعة الطلاب | {period['start']} إلى {period['end']}",
+        f"الطلاب: {summary['students']} | سجلات الحضور: {summary['attendance_records_in_period']}",
+        f"حالات للمراجعة: {summary['candidates']} | حالات تحتاج استكمال بيانات: {summary['unresolved']}",
+        "",
+        "الحالات المرشحة للمراجعة (دون ترتيب أولوية):",
+    ]
+    if not result["candidates"]:
+        lines.append("لا توجد مؤشرات مرصودة ضمن الفترة.")
+    for case in result["candidates"]:
+        lines.append(f"- {case['student_id']} ({case['alias']})")
+        for item in case["observations"]:
+            if item["type"] == "recorded_absence":
+                lines.append(f"  غياب مسجل: {item['count']} يوم؛ التواريخ: {', '.join(item['dates'])}؛ المصدر: attendance")
+            elif item["type"] == "lower_comparable_score":
+                previous, current = item["previous"], item["current"]
+                lines.append(f"  انخفاض علامة {item['subject']}: {previous['percent']}% ({previous['date']}) إلى {current['percent']}% ({current['date']})؛ المصدر: assessments")
+        for followup in case["previous_followups"]:
+            lines.append(f"  متابعة مسجلة: {followup['date']} | {followup['topic']} | {followup['outcome']}")
+        if not case["previous_followups"]:
+            lines.append("  لا توجد متابعة سابقة في الملف.")
+        if case["attendance"]["unrecorded"]:
+            lines.append(f"  حضور غير مسجل (ليس غيابًا): {', '.join(case['attendance']['explicit_unrecorded_dates'])}")
+
+    lines.extend(["", "حالات تحتاج استكمال بيانات:"])
+    if not result["unresolved"]:
+        lines.append("لا توجد حالات غير محسومة.")
+    for case in result["unresolved"]:
+        attendance = case["attendance"]
+        missing = []
+        if not (attendance["present"] or attendance["absent"] or attendance["unrecorded"]):
+            missing.append("لا توجد سجلات حضور في الفترة")
+        if attendance["explicit_unrecorded_dates"]:
+            missing.append("حضور غير مسجل في " + ", ".join(attendance["explicit_unrecorded_dates"]))
+        lines.append(f"- {case['student_id']} ({case['alias']}): {'؛ '.join(missing)}")
+        lines.append("  هذا ليس غيابًا مسجلًا.")
+    lines.extend(["", "هذه مؤشرات وصفية للمراجعة البشرية؛ لم تُعتمد عتبات إنذار، ولم تُرسل رسائل أو تُعدّل سجلات."])
+    return "\n".join(lines)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Review fictional student follow-up records")
     parser.add_argument("--data", required=True, help="JSON input file")
     parser.add_argument("--start", required=True, help="inclusive YYYY-MM-DD")
     parser.add_argument("--end", required=True, help="inclusive YYYY-MM-DD")
+    parser.add_argument("--json", action="store_true", help="print full machine-readable JSON instead of a concise report")
     args = parser.parse_args(argv)
     try:
         payload = json.loads(Path(args.data).read_text(encoding="utf-8"))
@@ -20,7 +64,10 @@ def main(argv=None):
     except (DataError, OSError, ValueError) as exc:
         print(f"Input error: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+    else:
+        print(format_report(result))
     return 0
 
 

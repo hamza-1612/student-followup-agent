@@ -1,6 +1,8 @@
 import copy
 import importlib.util
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -79,6 +81,17 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["result"]["summary"]["candidates"], 3)
         rejected = json.loads(tool({"data_file": "../project_sources/01-BRIEF.md", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertFalse(rejected["success"])
+
+    def test_cli_shows_every_case_and_preserves_json_option(self):
+        args = [sys.executable, "-m", "student_followup", "--data", "data/fictional_school.json",
+                "--start", "2026-09-07", "--end", "2026-09-11"]
+        report = subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=True).stdout
+        self.assertIn("حالات للمراجعة: 3 | حالات تحتاج استكمال بيانات: 1", report)
+        for sid in ("S-002", "S-003", "S-006", "S-004"):
+            self.assertIn(sid, report)
+        self.assertIn("حضور غير مسجل (ليس غيابًا)", report)
+        machine = subprocess.run(args + ["--json"], cwd=ROOT, text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(machine.stdout)["summary"]["candidates"], 3)
 
 
 if __name__ == "__main__":
