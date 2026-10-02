@@ -124,12 +124,23 @@ class AnalysisTests(unittest.TestCase):
 
         class Context:
             def register_tool(self, **kwargs):
-                self.registration = kwargs
+                self.registrations[kwargs["name"]] = kwargs
+
+            def __init__(self):
+                self.registrations = {}
 
         ctx = Context()
         plugin.register(ctx)
-        self.assertEqual(ctx.registration["name"], "student_followup_analyze")
-        tool = ctx.registration["handler"]
+        self.assertEqual(set(ctx.registrations), {"student_followup_info", "student_followup_analyze"})
+        info = json.loads(ctx.registrations["student_followup_info"]["handler"]({}))
+        self.assertTrue(info["success"])
+        self.assertEqual(info["datasets"], [{
+            "data_file": "data/fictional_school.json", "students": 30,
+            "attendance_records": 150, "assessment_records": 60,
+            "followup_records": 1,
+            "attendance_period": {"start": "2026-09-07", "end": "2026-09-11"},
+        }])
+        tool = ctx.registrations["student_followup_analyze"]["handler"]
         result = json.loads(tool({"data_file": "data/fictional_school.json", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertTrue(result["success"])
         self.assertEqual(result["result"]["summary"]["candidates"], 3)
@@ -144,16 +155,22 @@ plugin = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(plugin)
 class Context:
     def register_tool(self, **kwargs):
-        self.handler = kwargs['handler']
+        self.handlers[kwargs['name']] = kwargs['handler']
+    def __init__(self):
+        self.handlers = {}
 ctx = Context()
 plugin.register(ctx)
-print(ctx.handler({'data_file': 'data/fictional_school.json',
-                   'period_start': '2026-09-07', 'period_end': '2026-09-11'}))
+print(json.dumps({'info': json.loads(ctx.handlers['student_followup_info']({})),
+                  'analysis': json.loads(ctx.handlers['student_followup_analyze']({
+                      'data_file': 'data/fictional_school.json',
+                      'period_start': '2026-09-07', 'period_end': '2026-09-11'}))}))
 """
         with tempfile.TemporaryDirectory() as temp:
             run = subprocess.run([sys.executable, "-I", "-c", code, str(plugin_path)],
                                  cwd=temp, text=True, capture_output=True, check=True)
-        self.assertEqual(json.loads(run.stdout)["result"]["summary"]["candidates"], 3)
+        response = json.loads(run.stdout)
+        self.assertEqual(response["info"]["datasets"][0]["students"], 30)
+        self.assertEqual(response["analysis"]["result"]["summary"]["candidates"], 3)
 
     def test_cli_shows_every_case_and_preserves_json_option(self):
         args = [sys.executable, "-m", "student_followup", "--data", "data/fictional_school.json",

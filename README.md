@@ -64,9 +64,14 @@ hermes chat --toolsets student_followup -q "Use student_followup_analyze on data
 ```
 
 Hermes selects its configured model/provider; this project does not choose one
-or store credentials. The plugin registers one **read-only** tool, and permits
-JSON inputs only inside `data/`. It performs analysis in the same tested Python
-module as the CLI. `AGENTS.md` instructs Hermes to follow `BRIEF.md` and
+or store credentials. The plugin registers two **read-only** tools:
+`student_followup_info` finds available JSON datasets, counts students, and
+shows recorded attendance date ranges without requiring a period;
+`student_followup_analyze` applies the review rules to a chosen period. JSON
+inputs are confined to `data/`. The analysis uses the same tested Python
+module as the CLI. For "the existing file" and "the whole period," Hermes
+should discover the dataset and use its full recorded attendance date range.
+`AGENTS.md` instructs Hermes to follow `BRIEF.md` and
 `AGENT.md`, including the school-only conversation scope. Start a fresh chat
 after pulling instruction changes; an existing chat may keep its old context.
 For example, a request for a cooking recipe should receive a brief school-scope
