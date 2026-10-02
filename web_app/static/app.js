@@ -1,5 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { dataset: null, report: null, selected: null, sessionId: null, chatBusy: false };
+const state = { dataset: null, report: null, selected: null, sessionId: null, chatBusy: false,
+  guided: false, question: null, actionBusy: false, actionKey: null, actionRequestId: null };
 
 async function request(url, options = {}) {
   const response = await fetch(url, options);
@@ -101,6 +102,14 @@ function renderReport() {
     chart.append(row);
   }
   const cases = [...state.report.candidates, ...state.report.unresolved];
+  const missing = summary.missing_attendance || [];
+  $("#missing-count").textContent = `${missing.length} سجل`;
+  const missingList = $("#missing-list");
+  missingList.replaceChildren();
+  if (!missing.length) missingList.append(node("p", "empty", "كل أيام الدوام المعروفة لها حالة مسجلة لكل طالب في هذه الفترة."));
+  for (const item of missing) {
+    missingList.append(node("div", "missing-row", `${item.alias} · ${item.student_id} · ${item.date} · ${item.reason === "unrecorded" ? "غير مسجل" : "سجل مفقود"}`));
+  }
   $("#case-count").textContent = `${cases.length} حالات`;
   const list = $("#cases-list");
   list.replaceChildren();
@@ -151,6 +160,7 @@ function selectCase(studentId) {
     return;
   }
   $("#detail-title").textContent = `${item.alias} · ${item.student_id}`;
+  $("#feedback-student").value = item.student_id;
   $("#detail-priority").textContent = priorityName(item);
   $("#detail-priority").className = `priority-tag ${priorityClass(item)}`;
   const attendance = item.attendance;
@@ -167,6 +177,16 @@ function selectCase(studentId) {
   })));
   if (item.review) details.append(block("قرار مسجل للمراجع", `${decisionName(item.review.decision)} · ${item.review.note}`));
   $("#review-note").value = "";
+  const params = new URLSearchParams({ data_file: state.dataset, student_id: item.student_id });
+  request(`/api/context?${params}`).then(data => {
+    if (state.selected !== item.student_id || !data.events.length) return;
+    details.append(block("سياق محفوظ من الجولات السابقة", data.events.slice(0, 5).map(entry => {
+      if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${entry.label} · ${entry.note}`;
+      if (entry.type === "review") return `${entry.at.slice(0, 10)} · قرار مراجعة: ${decisionName(entry.decision)} · ${entry.note}`;
+      if (entry.type === "answer") return `${entry.at.slice(0, 10)} · إجابة: ${entry.answer}`;
+      return `${entry.at.slice(0, 10)} · ${entry.action}: ${entry.state}`;
+    })));
+  }).catch(() => {});
 }
 
 function decisionName(value) { return ({ verify_data: "التحقق من البيانات", follow_up_approved: "اعتماد خطوة متابعة", no_action: "لا إجراء حاليًا" })[value] || value; }
@@ -191,26 +211,116 @@ function addMessage(text, type) {
   return box;
 }
 
+function renderQuestion(box, question) {
+  if (!question || !Array.isArray(question.options)) return;
+  const panel = node("div", "question-panel");
+  panel.append(node("strong", "", question.text));
+  for (const option of question.options) {
+    const button = node("button", "question-option", option);
+    button.type = "button";
+    button.addEventListener("click", () => {
+      if (option === "تفصيل آخر" || option.includes("سأوضح")) {
+        $("#chat-input").placeholder = "اكتب التفاصيل التي تعرفها عن السؤال…";
+        $("#chat-input").focus();
+      } else sendChat(option);
+    });
+    panel.append(button);
+  }
+  box.append(panel);
+}
+
 async function sendChat(message) {
   if (state.chatBusy || !message.trim()) return;
   state.chatBusy = true;
   $("#chat-form button").disabled = true;
+  const answerTo = state.question?.id;
+  state.question = null;
   addMessage(message.trim(), "user");
   $("#chat-input").value = "";
   const waiting = addMessage("أراجع البيانات الآن…", "assistant");
   try {
-    const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId }) });
+    const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo }) });
     state.sessionId = data.session_id;
     waiting.querySelector("p").textContent = data.answer;
-  } catch (error) { waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
+    state.question = data.question;
+    renderQuestion(waiting, data.question);
+  } catch (error) { state.question = answerTo ? { id: answerTo } : null; waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
   finally { state.chatBusy = false; $("#chat-form button").disabled = false; }
+}
+
+async function saveFeedback(event) {
+  event.preventDefault();
+  const result = $("#feedback-result");
+  result.classList.remove("error");
+  try {
+    const data = await request("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, student_id: $("#feedback-student").value.trim(), label: $("#feedback-label").value, note: $("#feedback-note").value }) });
+    result.textContent = data.policy_changed ? `حُفظ التقييم وتحدّثت قواعد الفرز تلقائيًا إلى النسخة ${data.policy.version}.` : "حُفظ التقييم. سيُراجع الوكيل القواعد تلقائيًا عندما تتوفر أمثلة كافية.";
+    $("#feedback-note").value = "";
+    if (data.policy_changed) await loadAnalysis();
+  } catch (error) { result.textContent = error.message; result.classList.add("error"); }
+}
+
+async function createReport(event) {
+  event.preventDefault();
+  const feedback = $("#report-result");
+  feedback.classList.remove("error");
+  try {
+    const data = await request("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, purpose: $("#report-purpose").value }) });
+    const item = data.report;
+    feedback.textContent = `أُنشئ التقرير لغرض: ${item.purpose}`;
+    const box = $("#report-body");
+    box.replaceChildren(block("الحضور حسب اليوم", item.attendance_by_date.map(day => `${day.date}: ${day.present} حاضر، ${day.absent} غائب، ${day.unrecorded + day.missing_record} دون حضور/غياب محسوم`)));
+    box.append(block("الحالات والبيانات الناقصة", `${item.cases.length} حالات للمراجعة، ${item.missing_attendance.length} سجلات حضور تحتاج استكمالًا.`));
+  } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
+}
+
+function showActionFields() {
+  const kind = $("#action-type").value;
+  $("#action-day-fields").hidden = !["record_attendance", "add_school_day"].includes(kind);
+  $("#action-followup-fields").hidden = kind !== "resolve_followup";
+  $("#action-contact-fields").hidden = !["queue_contact", "send_email"].includes(kind);
+  $("#action-status").parentElement.hidden = kind !== "record_attendance";
+}
+
+async function runAction(event) {
+  event.preventDefault();
+  if (state.actionBusy) return;
+  const feedback = $("#action-result");
+  feedback.classList.remove("error");
+  const action = $("#action-type").value;
+  const button = $("#action-form button[type=submit]");
+  try {
+    if (action !== "add_school_day" && !state.selected) throw new Error("اختر الطالب من قائمة الحالات أولًا");
+    const body = { data_file: state.dataset, actor: $("#action-actor").value, action,
+      student_id: state.selected, day: $("#action-day").value, status: $("#action-status").value,
+      followup_id: $("#action-followup-id").value, outcome: $("#action-outcome").value,
+      recipient_type: $("#action-recipient").value, subject: $("#action-subject").value,
+      message: $("#action-message").value };
+    const key = JSON.stringify(body);
+    if (state.actionKey !== key) { state.actionKey = key; state.actionRequestId = crypto.randomUUID(); }
+    body.request_id = state.actionRequestId;
+    state.actionBusy = true;
+    button.disabled = true;
+    const data = await request("/api/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    feedback.textContent = data.action.state === "sent" ? "أكّد خادم البريد إرسال الرسالة وسُجّل الإجراء." : data.action.state === "queued_local" ? "حُفظ طلب التواصل محليًا، ولم تُرسل رسالة." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال. راجع مزود البريد قبل طلب جديد." : "نُفّذ التعديل على النسخة المحلية وسُجّل في سجل الإجراءات.";
+    state.actionKey = null;
+    state.actionRequestId = null;
+    if (["record_attendance", "resolve_followup", "add_school_day"].includes(action)) await loadAnalysis();
+  } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
+  finally { state.actionBusy = false; button.disabled = false; }
 }
 
 $("#analyze-btn").addEventListener("click", loadAnalysis);
 $("#review-form").addEventListener("submit", saveReview);
+$("#feedback-form").addEventListener("submit", saveFeedback);
+$("#report-form").addEventListener("submit", createReport);
+$("#action-form").addEventListener("submit", runAction);
+$("#action-type").addEventListener("change", showActionFields);
+showActionFields();
 $("#chat-form").addEventListener("submit", event => { event.preventDefault(); sendChat($("#chat-input").value); });
 $("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat($("#chat-input").value); } });
-$("#clear-chat").addEventListener("click", () => { state.sessionId = null; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن سجلات الطلاب أو ابدأ مراجعة تفاعلية.", "assistant"); });
+$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن سجلات الطلاب أو ابدأ مراجعة تفاعلية.", "assistant"); });
+$("#guided-start").addEventListener("click", () => { state.sessionId = null; state.guided = true; state.question = null; $("#chat-messages").replaceChildren(); sendChat("ابدأ مراجعة تفاعلية للملف والفترة المحددين."); });
 for (const button of document.querySelectorAll("[data-prompt]")) button.addEventListener("click", () => sendChat(button.dataset.prompt));
 refreshStatus();
 setInterval(refreshStatus, 8000);

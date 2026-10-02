@@ -45,7 +45,7 @@ def attach_reviews(result, latest):
     return result
 
 
-def record_review(data_bytes, start, end, student_id, decision, note, output):
+def record_review(data_bytes, start, end, student_id, decision, note, output, rules=None):
     if decision not in DECISIONS:
         raise DataError("invalid review decision")
     if not isinstance(note, str) or not note.strip():
@@ -54,7 +54,7 @@ def record_review(data_bytes, start, end, student_id, decision, note, output):
         data = json.loads(data_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise DataError(f"invalid JSON input: {exc}") from None
-    result = analyze(data, start, end)
+    result = analyze(data, start, end, rules)
     if student_id not in {case["student_id"] for case in result["candidates"] + result["unresolved"]}:
         raise DataError(f"{student_id}: no review case in the selected period")
     row = {"recorded_at": datetime.now(timezone.utc).isoformat(),

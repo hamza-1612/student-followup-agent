@@ -26,7 +26,7 @@ def build():
             {"student_id": sid, "subject": "Mathematics", "date": "2026-08-28", "score": 80, "max_score": 100},
             {"student_id": sid, "subject": "Mathematics", "date": "2026-09-11", "score": 62 if sid in {"S-003", "S-006"} else 80, "max_score": 100},
         ])
-    return {"students": students, "attendance": attendance, "assessments": assessments,
+    return {"students": students, "school_days": days, "attendance": attendance, "assessments": assessments,
             "followups": [{"id": "F-001", "student_id": "S-002", "date": "2026-09-09",
                            "topic": "attendance", "outcome": "Teacher requested a check-in; response pending"}]}
 

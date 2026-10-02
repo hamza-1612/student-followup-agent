@@ -1,7 +1,8 @@
 # Student Follow-up Agent — runnable first version
 
 Standalone prototype for the Agents at Work hackathon. It reviews **fictional**
-attendance, assessment, and follow-up data. `BRIEF.md` records project decisions;
+attendance, assessment, and follow-up data, asks guided questions, and supports
+audited local actions. `BRIEF.md` records project decisions;
 `AGENT.md` records intended agent behavior. No Academix connection is needed.
 
 ## Run the deterministic analyzer (Windows PowerShell)
@@ -100,22 +101,72 @@ and review form still work, while the chat panel explains the connection issue.
 To intentionally use only the dashboard, run `python -m web_app --no-hermes`.
 If another Hermes API gateway is already using port 8642, close it before
 starting the one-command interface, or provide its matching `API_SERVER_KEY`
-as an environment variable. No external messages or school records are edited.
+as an environment variable. The included dataset has no recipient email addresses,
+so no real message can be sent with the fixture.
 
 The interface is a small Python standard-library HTTP server and static
 HTML/CSS/JavaScript, with a server-side bridge to Hermes' local Responses API.
 It uses the same deterministic analyzer and reviewer log as the CLI. Chat
 history for the current browser session is kept in memory by the local bridge;
 the reviewer log remains in the ignored `outputs/reviews.jsonl` file. The
-included data are fictional. This is a local demo, without user accounts or
-shared-school deployment.
+included data are fictional. This is a local demo, without verified user accounts
+or shared-school deployment. The operator name is an audit label, not authentication.
+
+### Guided review, reports, actions, and learning
+
+- Pick any start and end dates. A period with no known school dates returns no
+  observed attendance; it does not invent absences. The `school_days` calendar
+  catches an entire day with no attendance rows. The dashboard lists each
+  student and date with `unrecorded` attendance or a missing row.
+- Click **ابدأ مراجعة تفاعلية** in the chat. The agent explains evidence and
+  presents one question with clickable options, starting with F-001's pending
+  outcome when relevant. Clicking an option answers the question; it is not
+  itself an attendance change. A free-text answer is available.
+- Enter a purpose under **تقارير حسب الطلب** to save an on-demand daily or
+  range report in ignored `outputs/reports.jsonl`. The report includes actual
+  attendance and the list needing completion. The Hermes report tool lets the
+  model phrase the report for the requested school purpose.
+- In **إجراءات محلية**, explicitly select an action and enter the operator,
+  student, date or message details. Attendance and follow-up edits use an
+  ignored overlay in `outputs/datasets/`; the committed fixture stays intact.
+  Each action gets an audit entry in `outputs/actions.jsonl`. Register a new
+  school day before adding attendance on it. A queued contact has state
+  `queued_local` and is **not sent**. The same explicit request needs no second
+  approval. The Hermes action tool can handle the same specific requests in chat.
+- Actual email requires `guardian_email` or `student_email` in the student row,
+  and `STUDENT_FOLLOWUP_SMTP_HOST`, `STUDENT_FOLLOWUP_SMTP_USER`,
+  `STUDENT_FOLLOWUP_SMTP_PASSWORD`, `STUDENT_FOLLOWUP_SMTP_FROM` (optionally
+  `STUDENT_FOLLOWUP_SMTP_PORT`, default 465) in the local process environment.
+  SMTP uses TLS. An attempted send is audited; state `sent` means the SMTP
+  server accepted it, not that a person read it. The fictional fixture has no
+  email addresses. There is no SMS or WhatsApp adapter yet.
+- Label a case **المؤشر صحيح**, **إنذار غير صحيح**, or **حالة فاتت الوكيل**
+  with a reason and student ID. Feedback
+  persists in `outputs/feedback.jsonl`. After at least eight distinct labeled
+  case/period examples, including three of each class, a deterministic score
+  checks threshold candidates and automatically promotes a version with at
+  least 0.1 greater balanced accuracy. The active thresholds are saved in
+  `outputs/rules.json` and changes in `outputs/policy_history.jsonl`. This
+  adjusts rules, not model weights or source code. The initial rules remain
+  until enough evidence exists. Missing attendance never becomes an absence.
+
+These actions are a **single-operator local demo**. Before connecting real
+student records, add school identity/permissions, a secure data source, contact
+verification, and the school's actual communication channel. The local tool
+does not modify Academix. Review the ignored `outputs/` directory if you need
+to reset the local demo state; do not commit it.
 
 Hermes selects its configured model/provider; this project does not choose one
-or store credentials. The plugin registers two **read-only** tools:
+or store credentials. The plugin registers six tools:
 `student_followup_info` finds available JSON datasets, counts students, and
 shows recorded attendance date ranges without requiring a period;
-`student_followup_analyze` applies the review rules to a chosen period. JSON
-inputs are confined to `data/`. The analysis uses the same tested Python
+`student_followup_analyze` applies the active review rules to a chosen period;
+`student_followup_report` produces an on-demand report;
+`student_followup_action` executes only named operations;
+`student_followup_feedback` saves a label and can update the rule version.
+`student_followup_context` retrieves the persistent case action/feedback/answer
+history across conversations. It omits contact message bodies and addresses.
+JSON inputs are confined to `data/`. The analysis uses the same tested Python
 module as the CLI. For "the existing file" and "the whole period," Hermes
 should discover the dataset and use its full recorded attendance date range.
 `AGENTS.md` instructs Hermes to follow `BRIEF.md` and
@@ -140,7 +191,7 @@ Do not enable project plugins for untrusted repositories.
 
 ## Input JSON contract
 
-All four top-level arrays are required:
+Four top-level arrays are required; `school_days` is an optional calendar:
 
 | Array | Required fields | Meaning |
 | --- | --- | --- |
@@ -148,16 +199,16 @@ All four top-level arrays are required:
 | `attendance` | `student_id`, `date`, `status` | One row per student and date; `status` is `present`, `absent`, or `unrecorded`. |
 | `assessments` | `student_id`, `subject`, `date`, `score`, `max_score` | Raw score and positive maximum; compare percentages within the same subject to the preceding dated assessment. |
 | `followups` | `id`, `student_id`, `date`, `topic`, `outcome` | Previous action/outcome; IDs unique. An empty list means none supplied. |
+| `school_days` | ISO date strings | Expected school dates, including a day with zero attendance rows. Recommended to detect complete-day gaps. |
 
 Dates use `YYYY-MM-DD`. `--start` and `--end` are inclusive. All referenced
 students must exist. Duplicate/conflicting attendance, duplicate assessments,
 invalid dates, and bad scores stop analysis instead of silently repairing data.
 Absence of a row is **not** proof of absence; a supplied `unrecorded` row is
-reported separately. For this demo, dates present in any attendance row define
-the shared school-day roster; a missing row for one student on one of those
-dates is reported as missing information. The analyzer does not infer additional
-school days outside that roster. A student with no attendance rows in the
-selected period requires verification.
+reported separately. When `school_days` is present, it defines the expected
+school dates, even when no student has a row on a date. Without it, dates present
+in any attendance row define the known roster; an entirely absent day cannot be
+inferred. A student missing rows on known school dates requires verification.
 
 `summary.data_quality_issues` counts cases with attendance gaps (explicit
 `unrecorded` or an omitted row), and `summary.data_quality_details` lists each
@@ -169,21 +220,24 @@ student totals distinguish presence at least once from presence on every
 recorded school day. `attendance_records_in_period` counts rows, not students
 who attended.
 
-The approved **demo review thresholds** are two recorded absences within any
-five consecutive supplied school dates, or a drop of at least 15 percentage
-points from the preceding dated assessment in the same subject. Attendance
-dates in the input define school days for the demo; the code does not assume a
-weekday calendar. Fewer than five supplied dates cannot trigger the absence
+The initial **demo review thresholds** are two recorded absences within any
+five consecutive school dates, or a drop of at least 15 percentage points
+from the preceding dated assessment in the same subject. The explicit calendar,
+or attendance dates when absent, defines school days; no weekday pattern is
+assumed. Fewer than five supplied dates cannot trigger the absence
 rule. The score rule compares percentages before rounding. A case with both
 signals has `high` priority, a case with one has `standard` priority; higher
 priority appears first. These are review priorities, not educational diagnoses.
 Recorded absence and a lower score below the thresholds are descriptive facts,
 not alerts. Missing attendance remains a verification case and is never counted
-as absence; a flagged case can also carry missing-information warnings.
+as absence; a flagged case can also carry missing-information warnings. The
+local feedback loop can change these thresholds in the UI and Hermes plugin;
+the standalone CLI keeps the original defaults unless explicitly extended.
 
-The agent should ask for any missing fact necessary to decide the next action,
-then present a draft for human approval. Review decisions can be logged locally;
-neither analysis nor a review decision sends messages or alters school records.
+The agent asks for a missing fact when needed. Analysis or saving a review
+decision never sends a message or alters records. An explicit action request
+uses the separate audited action tool; it does not need a second approval in
+this local demo.
 
 ## Demo and measurement
 
@@ -200,9 +254,11 @@ neither analysis nor a review decision sends messages or alters school records.
 
 ## Status and next decisions
 
-Implemented: JSON validation, demo alert rules and priority order, prior-follow-up lookup,
-local reviewer decision log, read-only Hermes plugin, fictional fixture, local
-browser interface, executable tests, and a live Hermes CLI run with the project
-plugin. Open: live browser-to-Hermes verification on Windows, measured time and
-tokens, reviewer decisions for the demonstration, and video/slides. No real student data or secrets should
+Implemented: JSON validation, versioned alert rules and priority order, explicit
+school calendar, missing-attendance list, reports, audited local record edits,
+contact queue/optional SMTP, automated feedback threshold tuning, guided
+question buttons, reviewer log, Hermes plugin, fictional fixture, browser UI,
+and executable tests. Open: live browser-to-Hermes verification on Windows,
+actual contact configuration and authentication for real deployments, measured
+time and tokens, demonstration feedback, and video/slides. No real student data or secrets should
 be committed. `.gitignore` excludes local credentials and private logs.

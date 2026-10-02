@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from web_app import server as web
 from web_app import __main__ as launcher
+from student_followup import storage, learning
 
 
 class WebAppTests(unittest.TestCase):
@@ -33,9 +34,15 @@ class WebAppTests(unittest.TestCase):
         self.old_reviews = web.REVIEWS
         web.REVIEWS = Path(self.temp.name) / "reviews.jsonl"
         web._sessions.clear()
+        self.storage_patch = patch.object(storage, "OUTPUT", Path(self.temp.name))
+        self.learning_patch = patch.object(learning, "OUTPUT", Path(self.temp.name))
+        self.storage_patch.start()
+        self.learning_patch.start()
 
     def tearDown(self):
         web.REVIEWS = self.old_reviews
+        self.learning_patch.stop()
+        self.storage_patch.stop()
         self.temp.cleanup()
 
     def fetch(self, path, body=None, origin=None):
@@ -107,6 +114,43 @@ class WebAppTests(unittest.TestCase):
             self.assertIn("student_followup_analyze", calls[-1][1]["instructions"])
         with patch.dict(os.environ, {"API_SERVER_KEY": ""}):
             self.assertEqual(self.fetch("/api/chat", {"message": "كم طالب؟"})[0], 503)
+
+    def test_agent_prompts_with_clickable_question_and_advances_on_answer(self):
+        calls = []
+
+        def fake_hermes(path, body=None, timeout=3):
+            calls.append(path)
+            if path == "/v1/toolsets":
+                return [{"name": "student_followup", "tools": ["student_followup_info", "student_followup_analyze"]}]
+            return {"id": f"resp-{len(calls)}", "output": [
+                {"type": "message", "content": [{"type": "output_text", "text": "وجدت ثلاث حالات للمراجعة."}]}]}
+
+        context = {"guided": True, "data_file": "data/fictional_school.json",
+                   "start": "2026-09-07", "end": "2026-09-11"}
+        with patch.dict(os.environ, {"API_SERVER_KEY": "test-local-secret"}), \
+             patch.object(web, "hermes_request", side_effect=fake_hermes):
+            first = json.loads(self.fetch("/api/chat", {**context, "message": "ابدأ المراجعة"})[2])
+            self.assertEqual(first["question"]["id"], "followup:F-001")
+            self.assertEqual(len(first["question"]["options"]), 4)
+            second = json.loads(self.fetch("/api/chat", {**context, "message": "لم تتم بعد",
+                "session_id": first["session_id"], "answer_to": "followup:F-001"})[2])
+            self.assertTrue(second["question"]["id"].startswith("attendance:"))
+            self.assertEqual(len(storage.events("dialogue.jsonl")), 1)
+
+    def test_report_feedback_and_local_action_http_flow(self):
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-10", "end": "2026-09-10"}
+        status, _, payload = self.fetch("/api/report", {**context, "purpose": "تقرير الغياب اليومي"})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(json.loads(payload)["report"]["missing_attendance"]), 1)
+        feedback = {**context, "start": "2026-09-07", "end": "2026-09-11",
+                    "student_id": "S-006", "label": "confirmed", "note": "Teacher confirmed score drop"}
+        self.assertEqual(self.fetch("/api/feedback", feedback)[0], 200)
+        self.assertEqual(len(storage.events("feedback.jsonl")), 1)
+        action = {"data_file": context["data_file"], "action": "record_attendance", "actor": "Teacher",
+                  "student_id": "S-004", "day": "2026-09-10", "status": "present"}
+        self.assertEqual(self.fetch("/api/actions", action)[0], 200)
+        self.assertEqual(json.loads(self.fetch("/api/report", {**context, "purpose": "تقرير الغياب اليومي"})[2])
+                         ["report"]["missing_attendance"], [])
 
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:
