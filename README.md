@@ -44,11 +44,14 @@ send a message or modify the input file. Use fictional notes for the demo.
 
 ## Run with Hermes (once installed and configured)
 
-Hermes supports project-local plugins, but requires an explicit trust opt-in.
-In PowerShell, while in this folder:
+Hermes supports project-local plugins, but requires two explicit opt-ins:
+discover project plugins and enable this plugin by its manifest name. In
+PowerShell, while in this folder:
 
 ```powershell
 $env:HERMES_ENABLE_PROJECT_PLUGINS = "true"
+hermes plugins list
+hermes plugins enable student-followup
 hermes chat --toolsets student_followup -q "Use student_followup_analyze on data/fictional_school.json for 2026-09-07 through 2026-09-11. Explain the recorded evidence, distinguish missing attendance, check previous follow-ups, and propose a human-reviewed next step for each case."
 ```
 
@@ -59,9 +62,13 @@ module as the CLI. `AGENTS.md` instructs Hermes to follow `BRIEF.md` and
 `AGENT.md`. Tool registration and the handler were tested with a simulated
 Hermes context; a live Hermes/model run has **not** yet been verified here.
 
-If the local plugin is not loaded, check that Hermes was launched from this
-folder and that the environment variable was set in the same PowerShell
-session. Do not enable project plugins for untrusted repositories.
+If Hermes says `Unknown toolsets: student_followup` or displays `0 tools`,
+check that it was launched from this folder, the environment variable was set
+in the same PowerShell session, and `hermes plugins list` shows the project
+plugin enabled. If `hermes` is missing from PATH on Windows after installation,
+open a new PowerShell window or invoke
+`& "$env:LOCALAPPDATA\hermes\bin\hermes.exe"` in place of `hermes`.
+Do not enable project plugins for untrusted repositories.
 
 ## Input JSON contract
 
