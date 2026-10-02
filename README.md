@@ -2,7 +2,7 @@
 
 Standalone prototype for the Agents at Work hackathon. It reviews **fictional**
 attendance, assessment, and follow-up data. `BRIEF.md` records project decisions;
-`AGENT.md` records intended agent behavior. No Academix connection or UI is needed.
+`AGENT.md` records intended agent behavior. No Academix connection is needed.
 
 ## Run the deterministic analyzer (Windows PowerShell)
 
@@ -77,6 +77,38 @@ a **new** session from this folder (with the same plugin opt-ins):
 The expected first question concerns the pending F-001 teacher check-in for
 S-002. You can answer in the chat; the conversation does not save a reviewer
 decision or send a message. Use the review CLI above to persist a decision.
+
+## Local browser interface (Windows)
+
+The optional Arabic dashboard shows the analysis, daily attendance, evidence,
+previous follow-ups, and a human review form. It also has a Hermes chat panel.
+No extra Python packages or cloud hosting are needed. From PowerShell in this
+repository, after configuring Hermes and enabling the project plugin as above:
+
+```powershell
+git pull --ff-only
+python -m web_app
+```
+
+Use `py -m web_app` if Python is exposed as `py`. Open
+`http://127.0.0.1:8000` in your browser. This command starts a local Hermes
+gateway with a temporary API key when it finds Hermes, and stops that child
+process when you press Ctrl+C. The key stays in the local processes and never
+goes to the browser. The interface and Hermes API bind to `127.0.0.1` only.
+If Hermes is unavailable or its project plugin is not enabled, the dashboard
+and review form still work, while the chat panel explains the connection issue.
+To intentionally use only the dashboard, run `python -m web_app --no-hermes`.
+If another Hermes API gateway is already using port 8642, close it before
+starting the one-command interface, or provide its matching `API_SERVER_KEY`
+as an environment variable. No external messages or school records are edited.
+
+The interface is a small Python standard-library HTTP server and static
+HTML/CSS/JavaScript, with a server-side bridge to Hermes' local Responses API.
+It uses the same deterministic analyzer and reviewer log as the CLI. Chat
+history for the current browser session is kept in memory by the local bridge;
+the reviewer log remains in the ignored `outputs/reviews.jsonl` file. The
+included data are fictional. This is a local demo, without user accounts or
+shared-school deployment.
 
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers two **read-only** tools:
@@ -169,7 +201,8 @@ neither analysis nor a review decision sends messages or alters school records.
 ## Status and next decisions
 
 Implemented: JSON validation, demo alert rules and priority order, prior-follow-up lookup,
-local reviewer decision log, read-only Hermes plugin, fictional fixture, executable
-tests, and a live Hermes run with the project plugin. Open: measured time and
+local reviewer decision log, read-only Hermes plugin, fictional fixture, local
+browser interface, executable tests, and a live Hermes CLI run with the project
+plugin. Open: live browser-to-Hermes verification on Windows, measured time and
 tokens, reviewer decisions for the demonstration, and video/slides. No real student data or secrets should
 be committed. `.gitignore` excludes local credentials and private logs.

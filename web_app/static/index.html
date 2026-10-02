@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123344">
+  <title>مرصد الطلاب | متابعة مبكرة</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="معلومات المشروع">
+      <div class="brand"><span class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></span><div><strong>مرصد الطلاب</strong><small>لوحة المتابعة المبكرة</small></div></div>
+      <div class="side-section"><div class="side-label">مسار المراجعة</div><div class="side-step active"><b>01</b><span>فحص السجلات</span></div><div class="side-step"><b>02</b><span>مراجعة الأدلة</span></div><div class="side-step"><b>03</b><span>قرار المسؤول</span></div></div>
+      <div class="side-note"><span class="note-icon" aria-hidden="true">✳</span><strong>القرار بيدك</strong><p>هذه البيانات للتجربة. يعرض النظام مؤشرات للمراجعة ولا يتخذ إجراءً بحق أي طالب.</p></div>
+      <div class="side-footer">نسخة العرض · بيانات مدرسية خيالية</div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar"><div><div class="eyebrow">لوحة المتابعة / نظرة عامة</div><h1>متابعة أوضح، قرار أهدأ.</h1><p>افحص الحضور والأداء والمتابعات السابقة، ثم راجع الخطوة التالية لكل حالة.</p></div><div class="top-status" id="connection-status"><span class="status-dot"></span><span>جارٍ فحص الاتصال</span></div></header>
+
+      <section class="filter-card" aria-label="نطاق التحليل"><div class="filter-title"><span class="section-kicker">01 / نطاق البيانات</span><strong>اختر الملف والفترة</strong></div><div class="filters"><label>ملف البيانات<select id="dataset-select" aria-label="ملف البيانات"></select></label><label>من تاريخ<input id="period-start" type="date"></label><label>إلى تاريخ<input id="period-end" type="date"></label><button id="analyze-btn" class="primary-button" type="button">تحديث التحليل <span aria-hidden="true">↗</span></button></div></section>
+
+      <section class="stat-grid" aria-label="ملخص الأرقام"><div class="stat-card"><span>الطلاب في الملف</span><strong id="stat-students">—</strong><small>ضمن مجموعة البيانات المختارة</small></div><div class="stat-card"><span>حالات للمراجعة</span><strong id="stat-candidates">—</strong><small>بلغت إحدى عتبات التجربة</small></div><div class="stat-card"><span>تحتاج استكمالًا</span><strong id="stat-unresolved">—</strong><small>معلومات حضور غير مكتملة</small></div><div class="stat-card"><span>أيام حضور مثبتة</span><strong id="stat-present">—</strong><small>مجموع حالات «حاضر» في الفترة</small></div></section>
+
+      <div class="work-grid">
+        <div class="evidence-column">
+          <section class="panel attendance-panel"><div class="panel-heading"><div><span class="section-kicker">02 / الحضور</span><h2>صورة الحضور اليومية</h2></div><span class="panel-hint">حاضر · غائب · غير مسجل</span></div><div id="attendance-chart" class="attendance-chart"><p class="empty">جارٍ تحميل الحضور…</p></div><p class="muted-note">السجل غير المسجّل أو المفقود لا يُحسب غيابًا.</p></section>
+
+          <section class="panel cases-panel"><div class="panel-heading"><div><span class="section-kicker">03 / الحالات</span><h2>حالات تستحق النظر</h2></div><span class="count-badge" id="case-count">—</span></div><div id="cases-list" class="cases-list"><p class="empty">جارٍ فحص الحالات…</p></div></section>
+
+          <section class="panel detail-panel" id="detail-panel"><div class="panel-heading"><div><span class="section-kicker">04 / مراجعة بشرية</span><h2 id="detail-title">اختر حالة من القائمة</h2></div><span id="detail-priority" class="priority-tag neutral">—</span></div><div id="detail-body" class="detail-body"><p class="empty">ستظهر هنا الأدلة وسجل المتابعة السابق.</p></div><form id="review-form" class="review-form" hidden><div class="review-divider"></div><label for="decision-select">قرار المراجع</label><div class="review-controls"><select id="decision-select" required><option value="verify_data">التحقق من البيانات</option><option value="follow_up_approved">اعتماد خطوة متابعة</option><option value="no_action">لا إجراء حاليًا</option></select><button class="primary-button" type="submit">حفظ القرار</button></div><label for="review-note">ملاحظة المراجع</label><textarea id="review-note" required maxlength="500" placeholder="مثال: التحقق من نتيجة المتابعة السابقة قبل أي تواصل جديد"></textarea><p class="form-footnote">يحفظ القرار محليًا فقط، ولا يرسل رسائل أو يغيّر سجل الطالب.</p><p id="review-feedback" class="form-feedback" role="status"></p></form></section>
+        </div>
+
+        <aside class="panel chat-panel" aria-label="محادثة الوكيل"><div class="chat-heading"><div class="chat-avatar" aria-hidden="true">✳</div><div><span class="section-kicker">مساعد المراجعة</span><h2>اسأل عن الحالات</h2></div><button id="clear-chat" class="icon-button" type="button" title="محادثة جديدة" aria-label="محادثة جديدة">↺</button></div><div id="chat-messages" class="chat-messages" aria-live="polite"><div class="message assistant"><span class="message-label">مساعد المراجعة</span><p>أهلًا. بقدر أشرح لك مؤشرات الحضور والأداء وأسألك عن المعلومات اللازمة قبل اتخاذ قرار.</p></div></div><div class="chat-bottom"><div class="suggestions"><button type="button" data-prompt="ابدأ مراجعة تفاعلية للملف الموجود والفترة كاملة، ثم اسألني سؤالًا واحدًا عن قرار المراجع.">ابدأ مراجعة تفاعلية</button><button type="button" data-prompt="لماذا الطالب S-006 أولوية عالية؟">لماذا S-006؟</button></div><form id="chat-form" class="chat-form"><label class="sr-only" for="chat-input">رسالتك</label><textarea id="chat-input" rows="2" maxlength="4000" placeholder="اسأل عن طالب أو حالة…"></textarea><button type="submit" aria-label="إرسال الرسالة" title="إرسال">↑</button></form><p class="chat-caption">المساعد يشرح الأدلة. القرار النهائي للمراجع.</p></div></aside>
+      </div>
+      <footer class="page-footer">مرصد الطلاب · تجربة محلية ببيانات خيالية <span>لا توجد رسائل مرسلة أو سجلات مدرسية معدّلة</span></footer>
+    </main>
+  </div>
+</body>
+</html>
