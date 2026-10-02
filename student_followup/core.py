@@ -69,6 +69,31 @@ def analyze(data, period_start, period_end):
     # A full window is required; never infer absence from an omitted row.
     days = sorted(school_dates)
     windows = [set(days[i:i + 5]) for i in range(max(0, len(days) - 4))]
+    daily_status = defaultdict(Counter)
+    present_dates = defaultdict(set)
+    for sid, records in attendance.items():
+        for record in records:
+            daily_status[record["date"]][record["status"]] += 1
+            if record["status"] == "present":
+                present_dates[sid].add(record["date"])
+    attendance_by_date = []
+    for day in days:
+        counts = daily_status[day]
+        attendance_by_date.append({
+            "date": day, "present": counts["present"], "absent": counts["absent"],
+            "unrecorded": counts["unrecorded"],
+            "missing_record": len(students) - sum(counts.values()),
+        })
+    attendance_summary = {
+        "by_date": attendance_by_date,
+        "present_student_days": sum(row["present"] for row in attendance_by_date),
+        "absent_student_days": sum(row["absent"] for row in attendance_by_date),
+        "unrecorded_student_days": sum(row["unrecorded"] for row in attendance_by_date),
+        "missing_record_student_days": sum(row["missing_record"] for row in attendance_by_date),
+        "students_present_at_least_once": len(present_dates),
+        "students_present_every_recorded_school_day":
+            sum(len(dates) == len(days) for dates in present_dates.values()) if days else 0,
+    }
 
     assessments = defaultdict(lambda: defaultdict(dict))
     for idx, row in enumerate(data["assessments"], 1):
@@ -163,6 +188,7 @@ def analyze(data, period_start, period_end):
                        for case in candidates + unresolved if case["missing_information"]]
     return {"period": {"start": period_start, "end": period_end}, "summary": {
         "students": len(students), "attendance_records_in_period": sum(len(v) for v in attendance.values()),
+        "attendance": attendance_summary,
         "assessment_records": len(data["assessments"]), "followup_records": len(data["followups"]),
         "candidates": len(candidates), "unresolved": len(unresolved),
         "data_quality_issues": len(quality_details), "data_quality_details": quality_details,

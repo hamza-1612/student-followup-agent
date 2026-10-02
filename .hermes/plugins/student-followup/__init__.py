@@ -50,7 +50,7 @@ def register(ctx):
 
     schema = {
         "name": "student_followup_analyze",
-        "description": "Validate fictional school JSON and apply demo review alerts: 2 recorded absences in 5 supplied school dates or a 15-point score drop in the same subject. The summary lists attendance gaps in data_quality_details; equal scores between different students are not duplicate records. Read-only; no messages.",
+        "description": "Validate fictional school JSON and apply demo review alerts. Summary.attendance gives actual present/absent/unrecorded counts by date and distinct students present at least once or every recorded school day. Attendance record count is not present-student count. Summary.data_quality_details lists gaps. Read-only; no messages.",
         "parameters": {
             "type": "object",
             "properties": {

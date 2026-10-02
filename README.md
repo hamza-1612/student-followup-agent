@@ -23,6 +23,10 @@ machine-readable output, add `--json` to the analysis command.
 Expected counts for the included sample: 30 students; 150 dated attendance
 records; 3 review candidates (S-002, S-003, S-006); one unresolved case
 (S-004). These are fixture checks, **not educational effectiveness claims**.
+For 2026-09-07 through 2026-09-09, the actual present counts are 30, 28,
+and 30 by day; 30 distinct students were present at least once, and 28 were
+present on all three dates. There are 90 attendance **records** in that period,
+but two of those records are marked `absent`.
 S-004's unrecorded attendance is not counted as absence. Every candidate has
 observed facts, a source, and follow-ups recorded through the period end.
 The fixture uses repeated baseline scores across students by design; equal
@@ -127,6 +131,11 @@ selected period requires verification.
 `unrecorded` or an omitted row), and `summary.data_quality_details` lists each
 affected student and the dates needing verification. It is not a count of
 duplicate assessments or proof that equal scores across students are incorrect.
+`summary.attendance.by_date` separates `present`, `absent`, `unrecorded`, and
+missing rows for each supplied date in the selected period. Its distinct
+student totals distinguish presence at least once from presence on every
+recorded school day. `attendance_records_in_period` counts rows, not students
+who attended.
 
 The approved **demo review thresholds** are two recorded absences within any
 five consecutive supplied school dates, or a drop of at least 15 percentage

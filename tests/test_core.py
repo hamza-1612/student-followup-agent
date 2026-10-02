@@ -48,7 +48,19 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(unresolved["S-001"]["attendance"]["absent"], 0)
         self.assertEqual(unresolved["S-001"]["attendance"]["missing_record_dates"], ["2026-09-09"])
         self.assertEqual(result["summary"]["data_quality_issues"], 3)
+        self.assertEqual(result["summary"]["attendance"]["by_date"][2]["missing_record"], 1)
         self.assertIn("S-001", {entry["student_id"] for entry in result["summary"]["data_quality_details"]})
+
+    def test_present_students_are_not_attendance_record_counts(self):
+        result = analyze(build(), "2026-09-07", "2026-09-09")
+        self.assertEqual(result["summary"]["attendance_records_in_period"], 90)
+        attendance = result["summary"]["attendance"]
+        self.assertEqual([(day["present"], day["absent"], day["unrecorded"])
+                          for day in attendance["by_date"]],
+                         [(30, 0, 0), (28, 2, 0), (30, 0, 0)])
+        self.assertEqual(attendance["present_student_days"], 88)
+        self.assertEqual(attendance["students_present_at_least_once"], 30)
+        self.assertEqual(attendance["students_present_every_recorded_school_day"], 28)
 
     def test_duplicate_and_conflicting_attendance_stops_analysis(self):
         data = build()

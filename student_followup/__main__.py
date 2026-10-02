@@ -16,9 +16,14 @@ def format_report(result):
         f"متابعة الطلاب | {period['start']} إلى {period['end']}",
         f"الطلاب: {summary['students']} | سجلات الحضور: {summary['attendance_records_in_period']}",
         f"حالات للمراجعة: {summary['candidates']} | حالات تحتاج استكمال بيانات: {summary['unresolved']}",
+        "الحضور الفعلي بحسب اليوم (حاضر، غائب، غير مسجل، سجل مفقود):",
+    ]
+    for day in summary["attendance"]["by_date"]:
+        lines.append(f"- {day['date']}: {day['present']}، {day['absent']}، {day['unrecorded']}، {day['missing_record']}")
+    lines.extend([
         "",
         "الإنذارات التجريبية (الأولوية الأعلى أولًا):",
-    ]
+    ])
     if not result["candidates"]:
         lines.append("لا توجد حالات بلغت عتبة الإنذار ضمن الفترة.")
     for case in result["candidates"]:

@@ -46,6 +46,12 @@ outcome before proposing another contact, but the reviewer decides the action.
 Do not suggest a causal or temporal link between an unrecorded attendance day
 and an assessment result merely because they share a date. Request each missing
 fact separately; a score drop alone does not establish why it occurred.
+When asked how many students attended, use `summary.attendance.by_date` for
+actual `present` counts. A dated attendance row may say `absent` or
+`unrecorded`; `attendance_records_in_period` is not a count of students who
+attended. For a multi-day question, report daily present counts and specify
+whether a distinct total means present at least once or on every recorded
+school day. Never equate 30 records per day with 30 present students.
 
 ## Human review conversation
 
