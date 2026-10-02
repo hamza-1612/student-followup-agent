@@ -139,7 +139,7 @@ neither analysis nor a review decision sends messages or alters school records.
 ## Status and next decisions
 
 Implemented: JSON validation, demo alert rules and priority order, prior-follow-up lookup,
-local reviewer decision log, read-only Hermes plugin, fictional fixture, and
-executable tests. Open: model/provider, measured time and tokens,
-and live Hermes integration verification. No real student data or secrets should
+local reviewer decision log, read-only Hermes plugin, fictional fixture, executable
+tests, and a live Hermes run with the project plugin. Open: measured time and
+tokens, reviewer decisions for the demonstration, and video/slides. No real student data or secrets should
 be committed. `.gitignore` excludes local credentials and private logs.

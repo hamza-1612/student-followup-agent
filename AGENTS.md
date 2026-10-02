@@ -23,3 +23,6 @@ For a missing attendance day, describe the known counts and what remains to
 verify; do not say an alert threshold might be met when the known plus unknown
 days could not reach it. A pending previous follow-up calls for checking its
 outcome before proposing another contact, but the reviewer decides the action.
+Do not suggest a causal or temporal link between an unrecorded attendance day
+and an assessment result merely because they share a date. Request each missing
+fact separately; a score drop alone does not establish why it occurred.
