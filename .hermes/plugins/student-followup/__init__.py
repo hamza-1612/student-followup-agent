@@ -8,7 +8,7 @@ from pathlib import Path
 def register(ctx):
     schema = {
         "name": "student_followup_analyze",
-        "description": "Validate fictional school JSON and apply approved demo review alerts: 2 recorded absences in 5 supplied school dates or a 15-point score drop in the same subject. Missing attendance is separate. Read-only; no messages.",
+        "description": "Validate fictional school JSON and apply demo review alerts: 2 recorded absences in 5 supplied school dates or a 15-point score drop in the same subject. The summary lists attendance gaps in data_quality_details; equal scores between different students are not duplicate records. Read-only; no messages.",
         "parameters": {
             "type": "object",
             "properties": {

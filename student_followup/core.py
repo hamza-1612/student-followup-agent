@@ -107,6 +107,7 @@ def analyze(data, period_start, period_end):
         counts = Counter(r["status"] for r in records)
         absences = [r["date"] for r in records if r["status"] == "absent"]
         unknown = [r["date"] for r in records if r["status"] == "unrecorded"]
+        missing_dates = sorted(school_dates - {r["date"] for r in records})
         observations = []
         alerts = []
         if absences:
@@ -147,18 +148,24 @@ def analyze(data, period_start, period_end):
         priority = "high" if len(kinds) == 2 else "standard" if alerts else "needs_verification"
         case = {"student_id": sid, "alias": alias, "priority": priority,
                 "alerts": alerts, "observations": observations,
-                "attendance": {"present": counts["present"], "absent": counts["absent"], "unrecorded": counts["unrecorded"], "explicit_unrecorded_dates": unknown},
+                "attendance": {"present": counts["present"], "absent": counts["absent"],
+                               "unrecorded": counts["unrecorded"], "explicit_unrecorded_dates": unknown,
+                               "missing_record_dates": missing_dates},
                 "previous_followups": prior, "missing_information": (["No attendance records in selected period"] if not records else []) + (["Attendance unrecorded on: " + ", ".join(unknown)] if unknown else [])}
+        if missing_dates:
+            case["missing_information"].append("Attendance row missing on: " + ", ".join(missing_dates))
         if alerts:
             candidates.append(case)
         elif case["missing_information"]:
             unresolved.append(case)
     candidates.sort(key=lambda case: (case["priority"] != "high", case["student_id"]))
+    quality_details = [{"student_id": case["student_id"], "missing_information": case["missing_information"]}
+                       for case in candidates + unresolved if case["missing_information"]]
     return {"period": {"start": period_start, "end": period_end}, "summary": {
         "students": len(students), "attendance_records_in_period": sum(len(v) for v in attendance.values()),
         "assessment_records": len(data["assessments"]), "followup_records": len(data["followups"]),
         "candidates": len(candidates), "unresolved": len(unresolved),
-        "data_quality_issues": sum(1 for c in candidates + unresolved if c["missing_information"]),
+        "data_quality_issues": len(quality_details), "data_quality_details": quality_details,
         "time_saved": None, "model_calls": None, "tokens_used": None},
         "candidates": candidates, "unresolved": unresolved,
         "policy_note": "Demo review rules: 2 recorded absences within 5 supplied school dates, or a 15 percentage-point score drop in the same subject. Both signals rank higher. Missing attendance is not absence. These are not educational diagnoses. No messages sent or records changed."}

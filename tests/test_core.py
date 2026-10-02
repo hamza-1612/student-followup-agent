@@ -21,6 +21,9 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["summary"]["attendance_records_in_period"], 150)
         self.assertEqual(result["summary"]["candidates"], 3)
         self.assertEqual(result["summary"]["unresolved"], 1)
+        self.assertEqual(result["summary"]["data_quality_issues"], 2)
+        self.assertEqual({entry["student_id"] for entry in result["summary"]["data_quality_details"]},
+                         {"S-004", "S-006"})
         candidates = {c["student_id"]: c for c in result["candidates"]}
         self.assertEqual(set(candidates), {"S-002", "S-003", "S-006"})
         self.assertEqual([c["student_id"] for c in result["candidates"]], ["S-006", "S-002", "S-003"])
@@ -34,6 +37,18 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["unresolved"][0]["attendance"]["absent"], 0)
         self.assertEqual(candidates["S-006"]["attendance"]["unrecorded"], 1)
         self.assertIsNone(result["summary"]["tokens_used"])
+
+    def test_missing_attendance_row_is_a_gap_not_an_absence(self):
+        data = build()
+        data["attendance"] = [row for row in data["attendance"]
+                              if not (row["student_id"] == "S-001" and row["date"] == "2026-09-09")]
+        result = analyze(data, "2026-09-07", "2026-09-11")
+        self.assertEqual(result["summary"]["candidates"], 3)
+        unresolved = {case["student_id"]: case for case in result["unresolved"]}
+        self.assertEqual(unresolved["S-001"]["attendance"]["absent"], 0)
+        self.assertEqual(unresolved["S-001"]["attendance"]["missing_record_dates"], ["2026-09-09"])
+        self.assertEqual(result["summary"]["data_quality_issues"], 3)
+        self.assertIn("S-001", {entry["student_id"] for entry in result["summary"]["data_quality_details"]})
 
     def test_duplicate_and_conflicting_attendance_stops_analysis(self):
         data = build()

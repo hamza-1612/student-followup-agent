@@ -36,6 +36,8 @@ def format_report(result):
             lines.append("  لا توجد متابعة سابقة في الملف.")
         if case["attendance"]["unrecorded"]:
             lines.append(f"  حضور غير مسجل (ليس غيابًا): {', '.join(case['attendance']['explicit_unrecorded_dates'])}")
+        if case["attendance"]["missing_record_dates"]:
+            lines.append(f"  سجل حضور مفقود (ليس غيابًا): {', '.join(case['attendance']['missing_record_dates'])}")
         if case.get("review"):
             lines.append(f"  قرار المراجع: {case['review']['decision']} | {case['review']['note']}")
 
@@ -49,6 +51,8 @@ def format_report(result):
             missing.append("لا توجد سجلات حضور في الفترة")
         if attendance["explicit_unrecorded_dates"]:
             missing.append("حضور غير مسجل في " + ", ".join(attendance["explicit_unrecorded_dates"]))
+        if attendance["missing_record_dates"]:
+            missing.append("سجل حضور مفقود في " + ", ".join(attendance["missing_record_dates"]))
         lines.append(f"- {case['student_id']} ({case['alias']}): {'؛ '.join(missing)}")
         lines.append("  هذا ليس غيابًا مسجلًا.")
         if case.get("review"):

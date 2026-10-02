@@ -25,6 +25,8 @@ records; 3 review candidates (S-002, S-003, S-006); one unresolved case
 (S-004). These are fixture checks, **not educational effectiveness claims**.
 S-004's unrecorded attendance is not counted as absence. Every candidate has
 observed facts, a source, and follow-ups recorded through the period end.
+The fixture uses repeated baseline scores across students by design; equal
+scores between different students do not indicate duplicate records.
 
 ## Record a human review decision
 
@@ -65,8 +67,10 @@ Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers one **read-only** tool, and permits
 JSON inputs only inside `data/`. It performs analysis in the same tested Python
 module as the CLI. `AGENTS.md` instructs Hermes to follow `BRIEF.md` and
-`AGENT.md`. Tool registration and the handler were tested with a simulated
-Hermes context; a live Hermes/model run has **not** yet been verified here.
+`AGENT.md`. A live Hermes run on Windows with the Nous `space-bunny-alpha`
+model successfully invoked the tool and reported three candidates and one
+unresolved case on the included fictional fixture. That run does not measure
+educational effectiveness or time savings.
 
 If Hermes says `Unknown toolsets: student_followup` or displays `0 tools`,
 check that it was launched from this folder, the environment variable was set
@@ -92,8 +96,16 @@ Dates use `YYYY-MM-DD`. `--start` and `--end` are inclusive. All referenced
 students must exist. Duplicate/conflicting attendance, duplicate assessments,
 invalid dates, and bad scores stop analysis instead of silently repairing data.
 Absence of a row is **not** proof of absence; a supplied `unrecorded` row is
-reported separately. A student with no attendance rows in the selected period
-requires verification; the analyzer does not infer every expected school day.
+reported separately. For this demo, dates present in any attendance row define
+the shared school-day roster; a missing row for one student on one of those
+dates is reported as missing information. The analyzer does not infer additional
+school days outside that roster. A student with no attendance rows in the
+selected period requires verification.
+
+`summary.data_quality_issues` counts cases with attendance gaps (explicit
+`unrecorded` or an omitted row), and `summary.data_quality_details` lists each
+affected student and the dates needing verification. It is not a count of
+duplicate assessments or proof that equal scores across students are incorrect.
 
 The approved **demo review thresholds** are two recorded absences within any
 five consecutive supplied school dates, or a drop of at least 15 percentage
