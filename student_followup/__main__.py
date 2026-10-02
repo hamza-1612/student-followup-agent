@@ -17,12 +17,13 @@ def format_report(result):
         f"الطلاب: {summary['students']} | سجلات الحضور: {summary['attendance_records_in_period']}",
         f"حالات للمراجعة: {summary['candidates']} | حالات تحتاج استكمال بيانات: {summary['unresolved']}",
         "",
-        "الحالات المرشحة للمراجعة (دون ترتيب أولوية):",
+        "الإنذارات التجريبية (الأولوية الأعلى أولًا):",
     ]
     if not result["candidates"]:
-        lines.append("لا توجد مؤشرات مرصودة ضمن الفترة.")
+        lines.append("لا توجد حالات بلغت عتبة الإنذار ضمن الفترة.")
     for case in result["candidates"]:
-        lines.append(f"- {case['student_id']} ({case['alias']})")
+        level = "أعلى" if case["priority"] == "high" else "عادية"
+        lines.append(f"- {case['student_id']} ({case['alias']}) | أولوية {level}")
         for item in case["observations"]:
             if item["type"] == "recorded_absence":
                 lines.append(f"  غياب مسجل: {item['count']} يوم؛ التواريخ: {', '.join(item['dates'])}؛ المصدر: attendance")
@@ -52,7 +53,7 @@ def format_report(result):
         lines.append("  هذا ليس غيابًا مسجلًا.")
         if case.get("review"):
             lines.append(f"  قرار المراجع: {case['review']['decision']} | {case['review']['note']}")
-    lines.extend(["", "هذه مؤشرات وصفية للمراجعة البشرية؛ لم تُعتمد عتبات إنذار، ولم تُرسل رسائل أو تُعدّل سجلات."])
+    lines.extend(["", "عتبات تجريبية للمراجعة: غياب مسجل يومان ضمن خمسة أيام دراسية، أو نزول 15 نقطة مئوية في المادة نفسها؛ اجتماع المؤشرين أولوية أعلى. الحضور غير المسجل ليس غيابًا. لم تُرسل رسائل أو تُعدّل سجلات."])
     return "\n".join(lines)
 
 

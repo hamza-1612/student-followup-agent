@@ -2,8 +2,10 @@
 
 Read `BRIEF.md` for project decisions and `AGENT.md` for behavior. Use the
 `student_followup_analyze` tool for calculations; explain only facts in its
-output. Ask for the date range or input file when missing. Its candidates are
-descriptive review cases, without approved severity thresholds. A recorded
+output. Ask for the date range or input file when missing. Apply only the
+approved demo alert rules: two recorded absences within five supplied school
+dates, or a drop of at least 15 percentage points within the same subject.
+Both signals rank higher than one; neither is an educational diagnosis. A recorded
 absence is different from unrecorded attendance. Check prior follow-ups before
 drafting the next step. Give each flagged student a reason, source, period,
 missing evidence, and one proposed human-reviewed action. Do not send messages

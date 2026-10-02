@@ -1,8 +1,4 @@
-"""Validate fictional school records and report observed follow-up indicators.
-
-No priority threshold is encoded here. An observed absence or a lower comparable
-score makes a student a review candidate, not an automatic risk diagnosis.
-"""
+"""Validate fictional records and apply the approved demo review thresholds."""
 
 from collections import Counter, defaultdict
 from datetime import date
@@ -53,6 +49,7 @@ def analyze(data, period_start, period_end):
 
     attendance = defaultdict(list)
     attendance_keys = set()
+    school_dates = set()
     for idx, row in enumerate(data["attendance"], 1):
         label = f"attendance[{idx}]"
         _fields(row, ("student_id", "date", "status"), label)
@@ -65,7 +62,13 @@ def analyze(data, period_start, period_end):
             raise DataError(f"{label}: duplicate or conflicting attendance for {sid} on {day}")
         attendance_keys.add(key)
         if start <= day <= end:
+            school_dates.add(day.isoformat())
             attendance[sid].append({"date": day.isoformat(), "status": row["status"]})
+
+    # Attendance dates in the input define school days for this fictional demo.
+    # A full window is required; never infer absence from an omitted row.
+    days = sorted(school_dates)
+    windows = [set(days[i:i + 5]) for i in range(max(0, len(days) - 4))]
 
     assessments = defaultdict(lambda: defaultdict(dict))
     for idx, row in enumerate(data["assessments"], 1):
@@ -105,8 +108,19 @@ def analyze(data, period_start, period_end):
         absences = [r["date"] for r in records if r["status"] == "absent"]
         unknown = [r["date"] for r in records if r["status"] == "unrecorded"]
         observations = []
+        alerts = []
         if absences:
             observations.append({"type": "recorded_absence", "count": len(absences), "dates": absences, "source": "attendance"})
+        qualifying = []
+        for window in windows:
+            window_absences = [day for day in absences if day in window]
+            if len(window_absences) >= 2:
+                qualifying.append((len(window_absences), sorted(window), window_absences))
+        if qualifying:
+            count, window_days, dates = max(qualifying, key=lambda item: (item[0], item[1]))
+            alerts.append({"type": "absence_in_five_school_days", "count": count,
+                           "threshold": 2, "window_dates": window_days, "dates": dates,
+                           "source": "attendance"})
         for subject, by_date in sorted(assessments[sid].items()):
             within = sorted((item for item in by_date.values() if start <= item[0] <= end), key=lambda v: v[0])
             history = sorted(by_date.values(), key=lambda v: v[0])
@@ -116,16 +130,30 @@ def analyze(data, period_start, period_end):
                     continue
                 old_pct = round(100 * previous[1] / previous[2], 2)
                 new_pct = round(100 * current[1] / current[2], 2)
-                if new_pct < old_pct:
-                    observations.append({"type": "lower_comparable_score", "subject": subject, "previous": {"date": previous[0].isoformat(), "score": previous[1], "max_score": previous[2], "percent": old_pct}, "current": {"date": current[0].isoformat(), "score": current[1], "max_score": current[2], "percent": new_pct}, "source": "assessments"})
+                drop = 100 * (previous[1] / previous[2] - current[1] / current[2])
+                if drop > 0:
+                    observation = {"type": "lower_comparable_score", "subject": subject,
+                                   "previous": {"date": previous[0].isoformat(), "score": previous[1], "max_score": previous[2], "percent": old_pct},
+                                   "current": {"date": current[0].isoformat(), "score": current[1], "max_score": current[2], "percent": new_pct},
+                                   "drop_percentage_points": round(drop, 2), "source": "assessments"}
+                    observations.append(observation)
+                    if drop >= 15:
+                        alerts.append({"type": "score_drop", "subject": subject,
+                                       "drop_percentage_points": round(drop, 2), "threshold": 15,
+                                       "previous": observation["previous"], "current": observation["current"],
+                                       "source": "assessments"})
         prior = sorted(followups[sid], key=lambda r: (r["date"], r["id"]), reverse=True)
-        case = {"student_id": sid, "alias": alias, "priority": "needs_review", "observations": observations,
+        kinds = {item["type"] for item in alerts}
+        priority = "high" if len(kinds) == 2 else "standard" if alerts else "needs_verification"
+        case = {"student_id": sid, "alias": alias, "priority": priority,
+                "alerts": alerts, "observations": observations,
                 "attendance": {"present": counts["present"], "absent": counts["absent"], "unrecorded": counts["unrecorded"], "explicit_unrecorded_dates": unknown},
                 "previous_followups": prior, "missing_information": (["No attendance records in selected period"] if not records else []) + (["Attendance unrecorded on: " + ", ".join(unknown)] if unknown else [])}
-        if observations:
+        if alerts:
             candidates.append(case)
         elif case["missing_information"]:
             unresolved.append(case)
+    candidates.sort(key=lambda case: (case["priority"] != "high", case["student_id"]))
     return {"period": {"start": period_start, "end": period_end}, "summary": {
         "students": len(students), "attendance_records_in_period": sum(len(v) for v in attendance.values()),
         "assessment_records": len(data["assessments"]), "followup_records": len(data["followups"]),
@@ -133,4 +161,4 @@ def analyze(data, period_start, period_end):
         "data_quality_issues": sum(1 for c in candidates + unresolved if c["missing_information"]),
         "time_saved": None, "model_calls": None, "tokens_used": None},
         "candidates": candidates, "unresolved": unresolved,
-        "policy_note": "Descriptive observations only; no approved alert threshold or priority order. No messages sent or records changed."}
+        "policy_note": "Demo review rules: 2 recorded absences within 5 supplied school dates, or a 15 percentage-point score drop in the same subject. Both signals rank higher. Missing attendance is not absence. These are not educational diagnoses. No messages sent or records changed."}

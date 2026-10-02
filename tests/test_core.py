@@ -23,6 +23,10 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["summary"]["unresolved"], 1)
         candidates = {c["student_id"]: c for c in result["candidates"]}
         self.assertEqual(set(candidates), {"S-002", "S-003", "S-006"})
+        self.assertEqual([c["student_id"] for c in result["candidates"]], ["S-006", "S-002", "S-003"])
+        self.assertEqual(candidates["S-006"]["priority"], "high")
+        self.assertEqual(candidates["S-002"]["priority"], "standard")
+        self.assertEqual(candidates["S-003"]["priority"], "standard")
         self.assertEqual(candidates["S-002"]["observations"][0]["dates"], ["2026-09-08", "2026-09-10"])
         self.assertEqual(len(candidates["S-002"]["previous_followups"]), 1)
         self.assertEqual(candidates["S-003"]["observations"][0]["current"]["percent"], 62)
@@ -57,12 +61,46 @@ class AnalysisTests(unittest.TestCase):
                 "attendance": [{"student_id": "S-A", "date": "2026-09-01", "status": "absent"},
                                {"student_id": "S-A", "date": "2026-10-01", "status": "present"}],
                 "assessments": [{"student_id": "S-A", "subject": "Math", "date": "2026-08-01", "score": 8, "max_score": 10},
-                                {"student_id": "S-A", "subject": "Math", "date": "2026-10-01", "score": 7, "max_score": 10}],
+                                {"student_id": "S-A", "subject": "Math", "date": "2026-10-01", "score": 6, "max_score": 10}],
                 "followups": []}
         result = analyze(data, "2026-10-01", "2026-10-01")
         self.assertEqual(result["summary"]["candidates"], 1)
         self.assertEqual(result["candidates"][0]["attendance"]["absent"], 0)
         self.assertEqual(result["candidates"][0]["observations"][0]["type"], "lower_comparable_score")
+
+    def test_demo_threshold_boundaries_and_missing_attendance(self):
+        data = build()
+        for row in data["attendance"]:
+            if row["student_id"] == "S-002" and row["date"] == "2026-09-10":
+                row["status"] = "unrecorded"
+        for row in data["assessments"]:
+            if row["student_id"] == "S-003" and row["date"] == "2026-09-11":
+                row["score"] = 66  # a 14-point drop is still descriptive only
+        result = analyze(data, "2026-09-07", "2026-09-11")
+        self.assertEqual([c["student_id"] for c in result["candidates"]], ["S-006"])
+        unresolved = {c["student_id"]: c for c in result["unresolved"]}
+        self.assertEqual(unresolved["S-002"]["attendance"]["absent"], 1)
+        self.assertEqual(unresolved["S-002"]["attendance"]["unrecorded"], 1)
+        self.assertNotIn("S-003", unresolved)
+        for row in data["assessments"]:
+            if row["student_id"] == "S-003" and row["date"] == "2026-09-11":
+                row["score"] = 65  # exactly 15 percentage points
+        result = analyze(data, "2026-09-07", "2026-09-11")
+        self.assertEqual({c["student_id"] for c in result["candidates"]}, {"S-003", "S-006"})
+
+    def test_absence_requires_two_in_one_full_five_date_window(self):
+        data = {"students": [{"student_id": "S-A", "alias": "A"}],
+                "attendance": [{"student_id": "S-A", "date": f"2026-09-{day:02}",
+                                "status": "absent" if day in (1, 6) else "present"}
+                               for day in range(1, 7)],
+                "assessments": [], "followups": []}
+        result = analyze(data, "2026-09-01", "2026-09-06")
+        self.assertEqual(result["summary"]["candidates"], 0)
+        data["attendance"][4]["status"] = "absent"
+        result = analyze(data, "2026-09-01", "2026-09-06")
+        self.assertEqual(result["candidates"][0]["alerts"][0]["count"], 2)
+        self.assertEqual(result["candidates"][0]["alerts"][0]["window_dates"],
+                         [f"2026-09-{day:02}" for day in range(2, 7)])
 
     def test_plugin_exposes_read_only_tool_and_confines_input(self):
         spec = importlib.util.spec_from_file_location("demo_plugin", ROOT / ".hermes/plugins/student-followup/__init__.py")

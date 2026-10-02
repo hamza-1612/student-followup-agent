@@ -81,12 +81,21 @@ Absence of a row is **not** proof of absence; a supplied `unrecorded` row is
 reported separately. A student with no attendance rows in the selected period
 requires verification; the analyzer does not infer every expected school day.
 
-An observed recorded absence or a lower comparable score creates a **review
-candidate**. This is a deliberately broad descriptive selection, not a risk
-level, alert threshold, or approved ordering. `priority` remains `needs_review`.
+The approved **demo review thresholds** are two recorded absences within any
+five consecutive supplied school dates, or a drop of at least 15 percentage
+points from the preceding dated assessment in the same subject. Attendance
+dates in the input define school days for the demo; the code does not assume a
+weekday calendar. Fewer than five supplied dates cannot trigger the absence
+rule. The score rule compares percentages before rounding. A case with both
+signals has `high` priority, a case with one has `standard` priority; higher
+priority appears first. These are review priorities, not educational diagnoses.
+Recorded absence and a lower score below the thresholds are descriptive facts,
+not alerts. Missing attendance remains a verification case and is never counted
+as absence; a flagged case can also carry missing-information warnings.
+
 The agent should ask for any missing fact necessary to decide the next action,
-then present a draft for human approval. The current tool does not persist
-review decisions, send messages, or alter school records.
+then present a draft for human approval. Review decisions can be logged locally;
+neither analysis nor a review decision sends messages or alters school records.
 
 ## Demo and measurement
 
@@ -103,8 +112,8 @@ review decisions, send messages, or alter school records.
 
 ## Status and next decisions
 
-Implemented: JSON validation, descriptive analysis, prior-follow-up lookup,
+Implemented: JSON validation, demo alert rules and priority order, prior-follow-up lookup,
 local reviewer decision log, read-only Hermes plugin, fictional fixture, and
-executable tests. Open: approved alert rules/priorities, model/provider,
+executable tests. Open: model/provider, measured time and tokens,
 and live Hermes integration verification. No real student data or secrets should
 be committed. `.gitignore` excludes local credentials and private logs.
