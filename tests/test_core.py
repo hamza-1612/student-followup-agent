@@ -121,6 +121,25 @@ class AnalysisTests(unittest.TestCase):
         rejected = json.loads(tool({"data_file": "../project_sources/01-BRIEF.md", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertFalse(rejected["success"])
 
+    def test_plugin_imports_project_package_from_isolated_launcher(self):
+        plugin_path = ROOT / ".hermes/plugins/student-followup/__init__.py"
+        code = """import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('demo_plugin', sys.argv[1])
+plugin = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(plugin)
+class Context:
+    def register_tool(self, **kwargs):
+        self.handler = kwargs['handler']
+ctx = Context()
+plugin.register(ctx)
+print(ctx.handler({'data_file': 'data/fictional_school.json',
+                   'period_start': '2026-09-07', 'period_end': '2026-09-11'}))
+"""
+        with tempfile.TemporaryDirectory() as temp:
+            run = subprocess.run([sys.executable, "-I", "-c", code, str(plugin_path)],
+                                 cwd=temp, text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(run.stdout)["result"]["summary"]["candidates"], 3)
+
     def test_cli_shows_every_case_and_preserves_json_option(self):
         args = [sys.executable, "-m", "student_followup", "--data", "data/fictional_school.json",
                 "--start", "2026-09-07", "--end", "2026-09-11"]

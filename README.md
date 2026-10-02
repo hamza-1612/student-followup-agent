@@ -45,13 +45,19 @@ send a message or modify the input file. Use fictional notes for the demo.
 ## Run with Hermes (once installed and configured)
 
 Hermes supports project-local plugins, but requires two explicit opt-ins:
-discover project plugins and enable this plugin by its manifest name. In
-PowerShell, while in this folder:
+discover project plugins and allow the plugin by its manifest name. In some
+Hermes releases, `hermes plugins list` and `hermes plugins enable` do not scan
+project-local plugins, even though the agent loader does. In PowerShell, while
+in this folder, preserve existing enabled plugins and add this one through the
+configuration command:
 
 ```powershell
 $env:HERMES_ENABLE_PROJECT_PLUGINS = "true"
-hermes plugins list
-hermes plugins enable student-followup
+$enabledJson = hermes config get plugins.enabled --json 2>$null
+$enabled = if ($LASTEXITCODE -eq 0) { @($enabledJson | ConvertFrom-Json) } else { @() }
+$enabled = @($enabled | Where-Object { $_ })
+if ("student-followup" -notin $enabled) { $enabled += "student-followup" }
+hermes config set plugins.enabled (ConvertTo-Json -InputObject $enabled -Compress)
 hermes chat --toolsets student_followup -q "Use student_followup_analyze on data/fictional_school.json for 2026-09-07 through 2026-09-11. Explain the recorded evidence, distinguish missing attendance, check previous follow-ups, and propose a human-reviewed next step for each case."
 ```
 
@@ -64,8 +70,9 @@ Hermes context; a live Hermes/model run has **not** yet been verified here.
 
 If Hermes says `Unknown toolsets: student_followup` or displays `0 tools`,
 check that it was launched from this folder, the environment variable was set
-in the same PowerShell session, and `hermes plugins list` shows the project
-plugin enabled. If `hermes` is missing from PATH on Windows after installation,
+in the same PowerShell session, and `hermes config get plugins.enabled --json`
+includes `student-followup`. `plugins list` may omit project plugins in affected
+Hermes releases. If `hermes` is missing from PATH on Windows after installation,
 open a new PowerShell window or invoke
 `& "$env:LOCALAPPDATA\hermes\bin\hermes.exe"` in place of `hermes`.
 Do not enable project plugins for untrusted repositories.

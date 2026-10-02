@@ -1,6 +1,7 @@
 """Project-local Hermes tool; analysis stays in the testable core."""
 
 import json
+import sys
 from pathlib import Path
 
 
@@ -23,10 +24,15 @@ def register(ctx):
     def handler(params, **kwargs):
         del kwargs
         try:
+            project = Path(__file__).resolve().parents[3]
+            # Hermes' Windows console launcher can omit the working directory
+            # from sys.path. Import this project's package from the plugin's
+            # own location instead of relying on the launcher environment.
+            if str(project) not in sys.path:
+                sys.path.insert(0, str(project))
             from student_followup import DataError, analyze
             from student_followup.reviews import attach_reviews, dataset_hash, load_latest
 
-            project = Path(__file__).resolve().parents[3]
             data_dir = (project / "data").resolve()
             target = (project / params["data_file"]).resolve()
             if not target.is_relative_to(data_dir) or target.suffix.lower() != ".json":
