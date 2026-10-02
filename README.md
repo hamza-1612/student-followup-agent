@@ -67,10 +67,15 @@ Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers one **read-only** tool, and permits
 JSON inputs only inside `data/`. It performs analysis in the same tested Python
 module as the CLI. `AGENTS.md` instructs Hermes to follow `BRIEF.md` and
-`AGENT.md`. A live Hermes run on Windows with the Nous `space-bunny-alpha`
-model successfully invoked the tool and reported three candidates and one
-unresolved case on the included fictional fixture. That run does not measure
-educational effectiveness or time savings.
+`AGENT.md`, including the school-only conversation scope. Start a fresh chat
+after pulling instruction changes; an existing chat may keep its old context.
+For example, a request for a cooking recipe should receive a brief school-scope
+reply without a recipe. This is a model instruction, not a guaranteed hard
+filter on every possible prompt; an enforced boundary would require a separate
+application gate around Hermes. A live Hermes run on Windows with the Nous
+`space-bunny-alpha` model successfully invoked the tool and reported three
+candidates and one unresolved case on the included fictional fixture. That run
+does not measure educational effectiveness or time savings.
 
 If Hermes says `Unknown toolsets: student_followup` or displays `0 tools`,
 check that it was launched from this folder, the environment variable was set
