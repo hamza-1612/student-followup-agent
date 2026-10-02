@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .core import DataError, analyze
+from .reviews import DEFAULT_OUTPUT, attach_reviews, dataset_hash, load_latest
 
 
 def format_report(result):
@@ -34,6 +35,8 @@ def format_report(result):
             lines.append("  لا توجد متابعة سابقة في الملف.")
         if case["attendance"]["unrecorded"]:
             lines.append(f"  حضور غير مسجل (ليس غيابًا): {', '.join(case['attendance']['explicit_unrecorded_dates'])}")
+        if case.get("review"):
+            lines.append(f"  قرار المراجع: {case['review']['decision']} | {case['review']['note']}")
 
     lines.extend(["", "حالات تحتاج استكمال بيانات:"])
     if not result["unresolved"]:
@@ -47,6 +50,8 @@ def format_report(result):
             missing.append("حضور غير مسجل في " + ", ".join(attendance["explicit_unrecorded_dates"]))
         lines.append(f"- {case['student_id']} ({case['alias']}): {'؛ '.join(missing)}")
         lines.append("  هذا ليس غيابًا مسجلًا.")
+        if case.get("review"):
+            lines.append(f"  قرار المراجع: {case['review']['decision']} | {case['review']['note']}")
     lines.extend(["", "هذه مؤشرات وصفية للمراجعة البشرية؛ لم تُعتمد عتبات إنذار، ولم تُرسل رسائل أو تُعدّل سجلات."])
     return "\n".join(lines)
 
@@ -57,10 +62,14 @@ def main(argv=None):
     parser.add_argument("--start", required=True, help="inclusive YYYY-MM-DD")
     parser.add_argument("--end", required=True, help="inclusive YYYY-MM-DD")
     parser.add_argument("--json", action="store_true", help="print full machine-readable JSON instead of a concise report")
+    parser.add_argument("--reviews", type=Path, default=DEFAULT_OUTPUT,
+                        help="local JSONL reviewer decisions (default: outputs/reviews.jsonl)")
     args = parser.parse_args(argv)
     try:
-        payload = json.loads(Path(args.data).read_text(encoding="utf-8"))
+        data_bytes = Path(args.data).read_bytes()
+        payload = json.loads(data_bytes)
         result = analyze(payload, args.start, args.end)
+        attach_reviews(result, load_latest(args.reviews, dataset_hash(data_bytes), args.start, args.end))
     except (DataError, OSError, ValueError) as exc:
         print(f"Input error: {exc}", file=sys.stderr)
         return 2

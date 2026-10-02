@@ -3,6 +3,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -92,6 +93,33 @@ class AnalysisTests(unittest.TestCase):
         self.assertIn("حضور غير مسجل (ليس غيابًا)", report)
         machine = subprocess.run(args + ["--json"], cwd=ROOT, text=True, capture_output=True, check=True)
         self.assertEqual(json.loads(machine.stdout)["summary"]["candidates"], 3)
+
+    def test_reviewer_decision_is_visible_only_for_matching_data_and_period(self):
+        data = ROOT / "data/fictional_school.json"
+        original = data.read_bytes()
+        with tempfile.TemporaryDirectory() as temp:
+            reviews = Path(temp) / "reviews.jsonl"
+            record = [sys.executable, "-m", "student_followup.reviews", "--data", str(data),
+                      "--start", "2026-09-07", "--end", "2026-09-11", "--student-id", "S-004",
+                      "--decision", "verify_data", "--note", "Check attendance register",
+                      "--output", str(reviews)]
+            subprocess.run(record, cwd=ROOT, text=True, capture_output=True, check=True)
+            command = [sys.executable, "-m", "student_followup", "--data", str(data),
+                       "--start", "2026-09-07", "--end", "2026-09-11",
+                       "--reviews", str(reviews), "--json"]
+            report = json.loads(subprocess.run(command, cwd=ROOT, text=True,
+                                               capture_output=True, check=True).stdout)
+            self.assertEqual(report["unresolved"][0]["review"]["decision"], "verify_data")
+            self.assertEqual(report["unresolved"][0]["attendance"]["absent"], 0)
+            self.assertFalse(json.loads(reviews.read_text(encoding="utf-8"))["executed"])
+            other_period = json.loads(subprocess.run(command[:6] + ["2026-09-10"] + command[7:],
+                                                     cwd=ROOT, text=True, capture_output=True, check=True).stdout)
+            self.assertFalse(any("review" in case for case in other_period["candidates"] + other_period["unresolved"]))
+            invalid = subprocess.run(record[:record.index("S-004")] + ["S-030"] +
+                                     record[record.index("S-004") + 1:], cwd=ROOT,
+                                     text=True, capture_output=True)
+            self.assertEqual(invalid.returncode, 2)
+        self.assertEqual(data.read_bytes(), original)
 
 
 if __name__ == "__main__":

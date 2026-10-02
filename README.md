@@ -26,6 +26,22 @@ records; 3 review candidates (S-002, S-003, S-006); one unresolved case
 S-004's unrecorded attendance is not counted as absence. Every candidate has
 observed facts, a source, and follow-ups recorded through the period end.
 
+## Record a human review decision
+
+After looking at the evidence, the reviewer can record one decision, for example:
+
+```powershell
+python -m student_followup.reviews --data data/fictional_school.json --start 2026-09-07 --end 2026-09-11 --student-id S-002 --decision verify_data --note "Check with teacher before contacting family"
+```
+
+Choices: `follow_up_approved` (approve a proposed next step), `verify_data`
+(request verification), and `no_action` (close this review case). This saves an
+append-only entry to `outputs/reviews.jsonl`; the folder is ignored by Git.
+Running the analyzer again shows the latest decision for that exact input file
+and period. Different data or dates will not reuse a stale decision. This
+records the **reviewer's decision**, never an executed follow-up. It does not
+send a message or modify the input file. Use fictional notes for the demo.
+
 ## Run with Hermes (once installed and configured)
 
 Hermes supports project-local plugins, but requires an explicit trust opt-in.
@@ -88,7 +104,7 @@ review decisions, send messages, or alter school records.
 ## Status and next decisions
 
 Implemented: JSON validation, descriptive analysis, prior-follow-up lookup,
-read-only Hermes plugin, fictional fixture, and executable tests. Open:
-approved alert rules/priorities, model/provider, reviewer feedback storage,
+local reviewer decision log, read-only Hermes plugin, fictional fixture, and
+executable tests. Open: approved alert rules/priorities, model/provider,
 and live Hermes integration verification. No real student data or secrets should
 be committed. `.gitignore` excludes local credentials and private logs.
