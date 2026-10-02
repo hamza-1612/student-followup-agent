@@ -63,6 +63,17 @@ hermes config set plugins.enabled (ConvertTo-Json -InputObject $enabled -Compres
 hermes chat --toolsets student_followup -q "Use student_followup_analyze on data/fictional_school.json for 2026-09-07 through 2026-09-11. Explain the recorded evidence, distinguish missing attendance, check previous follow-ups, and propose a human-reviewed next step for each case."
 ```
 
+To watch the agent ask the reviewer a question in an interactive chat, start
+a **new** session from this folder (with the same plugin opt-ins):
+
+```powershell
+& "$env:LOCALAPPDATA\hermes\bin\hermes.exe" chat --toolsets student_followup -q "Start an interactive student follow-up review. Discover the existing dataset and its whole attendance period, analyze it, summarize the evidence, then ask me one specific question needed for a human decision. Wait for my answer."
+```
+
+The expected first question concerns the pending F-001 teacher check-in for
+S-002. You can answer in the chat; the conversation does not save a reviewer
+decision or send a message. Use the review CLI above to persist a decision.
+
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers two **read-only** tools:
 `student_followup_info` finds available JSON datasets, counts students, and

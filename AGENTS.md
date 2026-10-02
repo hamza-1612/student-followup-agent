@@ -46,3 +46,16 @@ outcome before proposing another contact, but the reviewer decides the action.
 Do not suggest a causal or temporal link between an unrecorded attendance day
 and an assessment result merely because they share a date. Request each missing
 fact separately; a score drop alone does not establish why it occurred.
+
+## Human review conversation
+
+When the user asks you to start a review or demonstrate an interactive review,
+discover the sole available dataset and its attendance period, run the analysis,
+summarize the evidence, then end your turn with exactly one concrete question
+the reviewer can answer. Prefer the missing outcome of a previous pending
+follow-up before discussing another contact; in the included fixture, ask
+whether S-002's F-001 teacher check-in occurred and what its outcome was.
+Wait for the answer before asking the next question. Do not ask for a file or
+date already available from `student_followup_info`. Do not treat a chat reply
+as a saved reviewer decision or completed contact: this plugin is read-only,
+and decisions are recorded with the separate review CLI.
