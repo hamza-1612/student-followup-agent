@@ -1,124 +1,87 @@
-# Student Follow-up Agent — runnable first version
+# Student Follow-up Agent
 
-Standalone prototype for the Agents at Work hackathon. It reviews **fictional**
-attendance, assessment, and follow-up data, asks guided questions, and supports
-audited local actions. `BRIEF.md` records project decisions;
-`AGENT.md` records intended agent behavior. No Academix connection is needed.
+A local Arabic web app for reviewing fictional student attendance, assessments,
+and previous follow-ups. It highlights cases, asks the reviewer relevant
+questions, and records actions. It does not connect to Academix.
 
-## Run the deterministic analyzer (Windows PowerShell)
+## Run the web app (Windows PowerShell)
 
-From this folder with Python 3.10 or newer installed:
+**Requirements:** Git, Python 3.10 or newer, and Hermes with a configured model
+if you want to use the chat. The dashboard itself works without Hermes. No
+additional Python packages or hosting are needed.
+
+### 1. Get the project
+
+For a new download:
 
 ```powershell
-python -m student_followup --data data/fictional_school.json --start 2026-09-07 --end 2026-09-11
-python -m unittest discover -s tests -v
+git clone https://github.com/hamza-1612/student-followup-agent.git
+cd student-followup-agent
 ```
 
-Use `py` in place of `python` if that is how Python is installed. The analyzer
-needs no Python packages and no API key. On macOS/Linux, use `python3`.
-`python scripts/generate_demo.py` regenerates the same fictional input.
-Errors appear on stderr with exit code 2. The default output is a concise
-Arabic report listing **all** candidates and unresolved cases. For complete
-machine-readable output, add `--json` to the analysis command.
+If you already downloaded it, open PowerShell in the project folder and run
+`git pull --ff-only` instead.
 
-Expected counts for the included sample: 50 fictional students with Arabic
-names; 250 dated attendance records; 7 review candidates and 10 unresolved
-cases (11 students have an unrecorded attendance day, including one candidate). These are fixture checks, **not educational effectiveness claims**.
-For 2026-09-07 through 2026-09-09, the actual present counts are 48, 43,
-and 48 by day. There are 150 attendance **records** in that period;
-five are `absent` and six are `unrecorded`.
-S-004's unrecorded attendance is not counted as absence. Every candidate has
-observed facts, a source, and follow-ups recorded through the period end.
-The fixture uses repeated baseline scores across students by design; equal
-scores between different students do not indicate duplicate records.
+### 2. Enable the school plugin once
 
-## Record a human review decision
-
-After looking at the evidence, the reviewer can record one decision, for example:
+Hermes must already be installed and configured with a model. Run these
+commands **from the project folder**. They keep any other enabled plugins:
 
 ```powershell
-python -m student_followup.reviews --data data/fictional_school.json --start 2026-09-07 --end 2026-09-11 --student-id S-002 --decision verify_data --note "Check with teacher before contacting family"
-```
-
-Choices: `follow_up_approved` (approve a proposed next step), `verify_data`
-(request verification), and `no_action` (close this review case). This saves an
-append-only entry to `outputs/reviews.jsonl`; the folder is ignored by Git.
-Running the analyzer again shows the latest decision for that exact input file
-and period. Different data or dates will not reuse a stale decision. This
-records the **reviewer's decision**, never an executed follow-up. It does not
-send a message or modify the input file. Use fictional notes for the demo.
-
-## Run with Hermes (once installed and configured)
-
-Hermes supports project-local plugins, but requires two explicit opt-ins:
-discover project plugins and allow the plugin by its manifest name. In some
-Hermes releases, `hermes plugins list` and `hermes plugins enable` do not scan
-project-local plugins, even though the agent loader does. In PowerShell, while
-in this folder, preserve existing enabled plugins and add this one through the
-configuration command:
-
-```powershell
-$env:HERMES_ENABLE_PROJECT_PLUGINS = "true"
-$enabledJson = hermes config get plugins.enabled --json 2>$null
+$hermes = "$env:LOCALAPPDATA\hermes\bin\hermes.exe"
+$enabledJson = & $hermes config get plugins.enabled --json 2>$null
 $enabled = if ($LASTEXITCODE -eq 0) { @($enabledJson | ConvertFrom-Json) } else { @() }
 $enabled = @($enabled | Where-Object { $_ })
 if ("student-followup" -notin $enabled) { $enabled += "student-followup" }
-hermes config set plugins.enabled (ConvertTo-Json -InputObject $enabled -Compress)
-hermes chat --toolsets student_followup -q "Use student_followup_analyze on data/fictional_school.json for 2026-09-07 through 2026-09-11. Explain the recorded evidence, distinguish missing attendance, check previous follow-ups, and propose a human-reviewed next step for each case."
+& $hermes config set plugins.enabled (ConvertTo-Json -InputObject $enabled -Compress)
 ```
 
-To watch the agent ask the reviewer a question in an interactive chat, start
-a **new** session from this folder (with the same plugin opt-ins):
+If that path does not exist but `hermes` is on your PATH, set
+`$hermes = "hermes"` instead. You only need to enable the plugin once for your Hermes profile.
+
+### 3. Start and open the app
 
 ```powershell
-& "$env:LOCALAPPDATA\hermes\bin\hermes.exe" chat --toolsets student_followup -q "Start an interactive student follow-up review. Discover the existing dataset and its whole attendance period, analyze it, summarize the evidence, then ask me one specific question needed for a human decision. Wait for my answer."
-```
-
-The expected first question concerns the pending F-001 teacher check-in for
-S-002. You can answer in the chat; the conversation does not save a reviewer
-decision or send a message. Use the review CLI above to persist a decision.
-
-## Local browser interface (Windows)
-
-The optional Arabic dashboard shows the analysis, daily attendance, evidence,
-previous follow-ups, and a human review form. It also has a Hermes chat panel.
-No extra Python packages or cloud hosting are needed. From PowerShell in this
-repository, after configuring Hermes and enabling the project plugin as above:
-
-```powershell
-git pull --ff-only
 python -m web_app
 ```
 
-Use `py -m web_app` if Python is exposed as `py`. Open
-`http://127.0.0.1:8000` in your browser. On the first run, this command uses
-`hermes config set` to save a random `API_SERVER_KEY` and turn on
-`API_SERVER_ENABLED` in the local Hermes profile. Later runs reuse that key, so
-the profile-scoped gateway can read it. It starts a local gateway via
-`hermes gateway run` when port 8642 is free, and stops that child process when
-you press Ctrl+C. The key stays on the local machine and never goes to the
-browser. The interface and Hermes API bind to `127.0.0.1` only.
-If Hermes is unavailable or its project plugin is not enabled, the dashboard
-and review form still work, while the chat panel explains the connection issue.
-If the chat remains offline, read the status pill and the PowerShell output;
-an early gateway exit code or an occupied port is reported explicitly. Wait
-for gateway startup before trying the chat.
-To intentionally use only the dashboard, run `python -m web_app --no-hermes`.
-If Hermes already serves the API on port 8642, the interface uses the profile's
-configured key to connect. The included dataset has no recipient email addresses,
-so no real message can be sent with the fixture.
-If a Hermes gateway is running in the background but port 8642 is not open,
-stop the UI, run `& "$env:LOCALAPPDATA\hermes\bin\hermes.exe" gateway stop`,
-then run `python -m web_app` again. This temporarily stops Hermes's background
-messaging and scheduled jobs; `hermes gateway start` restores it later.
+Open **http://127.0.0.1:8000** in your browser. Leave PowerShell open while
+using the app; press **Ctrl+C** to stop it. If Windows recognizes `py` but not
+`python`, use `py -m web_app`.
 
-The interface is a small Python standard-library HTTP server and static
-HTML/CSS/JavaScript, with a server-side bridge to Hermes' local Responses API.
-It uses the same deterministic analyzer and reviewer log as the CLI. Chat
-history for the current browser session is kept in memory by the local bridge;
-the reviewer log remains in the ignored `outputs/reviews.jsonl` file. The
-included data are fictional. This is a local demo, without verified user accounts
-or shared-school deployment. The operator name is an audit label, not authentication.
+The app starts or connects to the local Hermes gateway for chat when possible. On first run,
+it configures a local API key automatically. Wait for the connection indicator
+to show that chat is ready. Try asking “ما حالة تالا أمجد؟” or “مين الطلاب
+اللي حضورهم غير مسجل؟”. The analysis and review panels still work if chat is
+offline.
+
+**Next time:** from the project folder, run `git pull --ff-only` and
+`python -m web_app`. After changes to the agent instructions, start a new
+chat in the web app.
+
+### If chat does not connect
+
+- Check that Hermes is installed, has a configured model, and that the plugin
+  command in step 2 completed successfully.
+- If port 8642 is occupied by an old Hermes gateway, stop the app, run
+  `& "$env:LOCALAPPDATA\hermes\bin\hermes.exe" gateway stop`, and start
+  `python -m web_app` again. This pauses Hermes background messaging and
+  scheduled jobs until you restart the gateway.
+- Read the connection indicator and PowerShell output for the specific error.
+  You can run the dashboard alone with `python -m web_app --no-hermes`.
+
+The included student records are fictional. Saved actions and case answers
+are stored locally under `outputs/`; the folder is ignored by Git. The
+included file has no real recipient addresses, so a contact recorded in this
+app does not reach an external person.
+
+## What the web app can do
+
+The dashboard shows daily attendance, cases, missing records, and previous
+follow-ups. The chat uses Hermes to explain a case and propose a relevant next
+step. The app runs on your computer at `127.0.0.1`. Its local bridge and
+student analysis use Python's standard library. Chat session state lives in
+the local server process; action and review records persist under `outputs/`.
 
 ### Guided review, reports, actions, and learning
 
@@ -171,11 +134,10 @@ or shared-school deployment. The operator name is an audit label, not authentica
 These actions are a **single-operator local demo**. Before connecting real
 student records, add school identity/permissions, a secure data source, contact
 verification, and the school's actual communication channel. The local tool
-does not modify Academix. To reset the local demo records and see the updated fixture, stop the app and remove
-`outputs/datasets/fictional_school.json`. This discards local changes to the
-student records. The audit logs under `outputs/` stay in place; clear them
-separately only if you also want to reset the demonstration history. Do not
-commit `outputs/`.
+does not modify Academix. To start with fresh fictional records, stop the app
+and rename `outputs/` to a backup folder, then restart it. This resets local
+edits and history while preserving the old files in the backup. Do not commit
+`outputs/` or the backup.
 
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers six tools:
@@ -197,10 +159,9 @@ after pulling instruction changes; an existing chat may keep its old context.
 For example, a request for a cooking recipe should receive a brief school-scope
 reply without a recipe. This is a model instruction, not a guaranteed hard
 filter on every possible prompt; an enforced boundary would require a separate
-application gate around Hermes. A live Hermes run on Windows with the Nous
-`space-bunny-alpha` model successfully invoked the tool and reported three
-candidates and one unresolved case on the included fictional fixture. That run
-does not measure educational effectiveness or time savings.
+application gate around Hermes. The included dataset and review counts are
+checked by automated tests. No educational effectiveness or time savings are
+claimed without measurement.
 
 If Hermes says `Unknown toolsets: student_followup` or displays `0 tools`,
 check that it was launched from this folder, the environment variable was set
@@ -210,6 +171,60 @@ Hermes releases. If `hermes` is missing from PATH on Windows after installation,
 open a new PowerShell window or invoke
 `& "$env:LOCALAPPDATA\hermes\bin\hermes.exe"` in place of `hermes`.
 Do not enable project plugins for untrusted repositories.
+
+## Command-line analyzer (optional)
+
+From this folder with Python 3.10 or newer installed:
+
+```powershell
+python -m student_followup --data data/fictional_school.json --start 2026-09-07 --end 2026-09-11
+python -m unittest discover -s tests -v
+```
+
+Use `py` in place of `python` if that is how Python is installed. The analyzer
+needs no Python packages and no API key. On macOS/Linux, use `python3`.
+`python scripts/generate_demo.py` regenerates the same fictional input.
+Errors appear on stderr with exit code 2. The default output is a concise
+Arabic report listing **all** candidates and unresolved cases. For complete
+machine-readable output, add `--json` to the analysis command.
+
+Expected counts for the included sample: 50 fictional students with Arabic
+names; 250 dated attendance records; 7 review candidates and 10 unresolved
+cases. Eleven students have an unrecorded attendance day, including one
+candidate. These are fixture checks, **not educational effectiveness claims**.
+For 2026-09-07 through 2026-09-09, the actual present counts are 48, 43,
+and 48 by day. There are 150 attendance **records** in that period;
+five are `absent` and six are `unrecorded`.
+S-004's unrecorded attendance is not counted as absence. Every candidate has
+observed facts, a source, and follow-ups recorded through the period end.
+The fixture uses repeated baseline scores across students by design; equal
+scores between different students do not indicate duplicate records.
+
+## Record a human review decision
+
+After looking at the evidence, the reviewer can record one decision, for example:
+
+```powershell
+python -m student_followup.reviews --data data/fictional_school.json --start 2026-09-07 --end 2026-09-11 --student-id S-002 --decision verify_data --note "Check with teacher before contacting family"
+```
+
+Choices: `follow_up_approved` (approve a proposed next step), `verify_data`
+(request verification), and `no_action` (close this review case). This saves an
+append-only entry to `outputs/reviews.jsonl`; the folder is ignored by Git.
+Running the analyzer again shows the latest decision for that exact input file
+and period. Different data or dates will not reuse a stale decision. This
+records the **reviewer's decision**, never an executed follow-up. It does not
+send a message or modify the input file. Use fictional notes for the demo.
+
+## Hermes terminal chat (optional)
+
+The browser is the simplest way to use the agent. If you prefer Hermes in
+PowerShell, complete step 2 above first, then run from the project folder:
+
+```powershell
+$env:HERMES_ENABLE_PROJECT_PLUGINS = "true"
+& "$env:LOCALAPPDATA\hermes\bin\hermes.exe" chat --toolsets student_followup -q "Review the existing school data for its full attendance period and ask me one useful follow-up question."
+```
 
 ## Input JSON contract
 
@@ -280,7 +295,6 @@ Implemented: JSON validation, versioned alert rules and priority order, explicit
 school calendar, missing-attendance list, reports, audited local record edits,
 simulated communication history/optional SMTP, automated feedback threshold
 tuning, case-specific choice buttons, reviewer log, Hermes plugin, fictional fixture, browser UI,
-and executable tests. Open: live browser-to-Hermes verification on Windows,
-actual contact configuration and authentication for real deployments, measured
-time and tokens, demonstration feedback, and video/slides. No real student data or secrets should
-be committed. `.gitignore` excludes local credentials and private logs.
+and executable tests. Open: actual contact configuration and authentication
+for real deployments, measured time and tokens, demonstration feedback, and
+video/slides. No real student data or secrets should be committed. `.gitignore` excludes local credentials and private logs.
