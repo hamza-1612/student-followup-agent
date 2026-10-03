@@ -185,6 +185,14 @@ class AnalysisTests(unittest.TestCase):
             "data_file": "data/fictional_school.json", "period_start": "2026-09-10",
             "period_end": "2026-09-10", "purpose": "فحص حضور اليوم"}))
         self.assertEqual(daily["report"]["missing_attendance"][0]["student_id"], "S-004")
+        self.assertNotIn("actor", ctx.registrations["student_followup_action"]["schema"]["parameters"]["required"])
+        with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)):
+            performed = json.loads(ctx.registrations["student_followup_action"]["handler"]({
+                "data_file": "data/fictional_school.json", "action": "record_attendance",
+                "student_id": "S-004", "day": "2026-09-10", "status": "present"}))
+            self.assertTrue(performed["success"])
+            self.assertEqual(performed["action"]["state"], "completed")
+            self.assertIn("غير موثقة", performed["action"]["actor"])
 
     def test_local_actions_edit_overlay_and_audit_without_touching_fixture(self):
         original = (ROOT / "data/fictional_school.json").read_bytes()

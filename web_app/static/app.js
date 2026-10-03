@@ -1,6 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const state = { dataset: null, report: null, selected: null, sessionId: null, chatBusy: false,
-  guided: false, question: null, actionBusy: false, actionKey: null, actionRequestId: null };
+  guided: false, question: null, freeformAnswerTo: null, freeformSave: false,
+  actionBusy: false, actionKey: null, actionRequestId: null };
 
 async function request(url, options = {}) {
   const response = await fetch(url, options);
@@ -219,32 +220,37 @@ function renderQuestion(box, question) {
     const button = node("button", "question-option", option);
     button.type = "button";
     button.addEventListener("click", () => {
-      if (option === "تفصيل آخر" || option.includes("سأوضح")) {
-        $("#chat-input").placeholder = "اكتب التفاصيل التي تعرفها عن السؤال…";
+      if (option === "تفصيل آخر" || option.includes("اكتب النتيجة")) {
+        state.freeformAnswerTo = question.id;
+        state.freeformSave = option.includes("اكتب النتيجة");
+        $("#chat-input").placeholder = state.freeformSave ? "اكتب نتيجة المتابعة لتحفظها…" : "اكتب التفاصيل التي تعرفها عن السؤال…";
         $("#chat-input").focus();
-      } else sendChat(option);
+      } else sendChat(option, question.id);
     });
     panel.append(button);
   }
   box.append(panel);
 }
 
-async function sendChat(message) {
+async function sendChat(message, answerTo = state.freeformAnswerTo, saveAnswer = state.freeformSave) {
   if (state.chatBusy || !message.trim()) return;
   state.chatBusy = true;
   $("#chat-form button").disabled = true;
-  const answerTo = state.question?.id;
+  const oldQuestion = state.question;
   state.question = null;
+  state.freeformAnswerTo = null;
+  state.freeformSave = false;
   addMessage(message.trim(), "user");
   $("#chat-input").value = "";
   const waiting = addMessage("أراجع البيانات الآن…", "assistant");
   try {
-    const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo }) });
+    const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo, save_answer: saveAnswer }) });
     state.sessionId = data.session_id;
     waiting.querySelector("p").textContent = data.answer;
     state.question = data.question;
     renderQuestion(waiting, data.question);
-  } catch (error) { state.question = answerTo ? { id: answerTo } : null; waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
+    if (data.changed) await loadAnalysis();
+  } catch (error) { state.question = oldQuestion; state.freeformAnswerTo = answerTo; state.freeformSave = saveAnswer; waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
   finally { state.chatBusy = false; $("#chat-form button").disabled = false; }
 }
 
@@ -319,8 +325,8 @@ $("#action-type").addEventListener("change", showActionFields);
 showActionFields();
 $("#chat-form").addEventListener("submit", event => { event.preventDefault(); sendChat($("#chat-input").value); });
 $("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat($("#chat-input").value); } });
-$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن سجلات الطلاب أو ابدأ مراجعة تفاعلية.", "assistant"); });
-$("#guided-start").addEventListener("click", () => { state.sessionId = null; state.guided = true; state.question = null; $("#chat-messages").replaceChildren(); sendChat("ابدأ مراجعة تفاعلية للملف والفترة المحددين."); });
+$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; state.freeformAnswerTo = null; state.freeformSave = false; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن سجلات الطلاب أو ابدأ مراجعة تفاعلية.", "assistant"); });
+$("#guided-start").addEventListener("click", () => { state.sessionId = null; state.guided = true; state.question = null; state.freeformAnswerTo = null; state.freeformSave = false; $("#chat-messages").replaceChildren(); sendChat("ابدأ مراجعة تفاعلية للملف والفترة المحددين."); });
 for (const button of document.querySelectorAll("[data-prompt]")) button.addEventListener("click", () => sendChat(button.dataset.prompt));
 refreshStatus();
 setInterval(refreshStatus, 8000);

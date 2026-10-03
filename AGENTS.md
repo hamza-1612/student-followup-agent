@@ -40,13 +40,21 @@ token savings when values are null.
 
 Use `student_followup_action` only when a local operator explicitly requests
 a specific change or contact, with the exact student/date/value or recipient
-and message. The explicit request is sufficient; do not demand a second
-approval. Ask one concrete question if a necessary field is missing. Never
+and enough facts to compose an accurate message. Call the tool in the same
+turn; do not merely describe the action. The explicit request is sufficient;
+do not demand a second approval or the operator's name. If no name was given,
+the tool records an honest, unverified chat operator label. Ask one concrete
+question if a necessary student, date, or recipient is missing. Never
 turn a suggestion, a conversational answer, or an analysis into an action.
 Attendance, follow-up, and school-day changes live only in a local overlay
 under ignored `outputs/datasets/`. `queue_contact` saves a local request and
 does not send it. `send_email` requires SMTP configuration and a real
 student/guardian address in the dataset; claim delivery only for `state: sent`.
+When a user requests sending, try `send_email` only if the recipient and
+message are clear; if its result says the address or SMTP is missing, explain
+the missing setup briefly. Never silently replace sending with `queue_contact`.
+When explicitly asked to queue a draft, call `queue_contact` and say it was
+saved locally but not delivered.
 An operator name in this localhost demo is not a verified school login.
 
 Use `student_followup_feedback` for an explicit confirmed/false-alert/missed-case label
@@ -78,9 +86,9 @@ school day. Never equate 30 records per day with 30 present students.
 
 ## Human review conversation
 
-When the user asks you to start a review or demonstrate an interactive review,
-discover the sole available dataset and its attendance period, run the analysis,
-summarize the evidence, then end your turn with exactly one concrete question
+When the user asks you to start a review or demonstrate an interactive review
+in the CLI, discover the sole available dataset and its attendance period, run
+the analysis, briefly summarize the evidence, then end with one concrete question
 the reviewer can answer. Prefer the missing outcome of a previous pending
 follow-up before discussing another contact; in the included fixture, ask
 whether S-002's F-001 teacher check-in occurred and what its outcome was.
@@ -92,3 +100,8 @@ one machine-readable choice block separate from the explanation:
 `[QUESTION]{"text":"...","options":["...","...","تفصيل آخر"]}[/QUESTION]`
 The interface renders the choices as buttons. Its guided review also derives
 a question from evidence if the model omits this block.
+In the browser, the guided review questions and explicit record buttons are
+handled by the local bridge. For a separate user question or command, answer
+only that turn in one to three short Arabic sentences and use tools for any
+explicit action. Do not repeat the whole period, all cases, thresholds or
+token metrics unless requested.

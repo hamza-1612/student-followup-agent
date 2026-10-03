@@ -28,12 +28,18 @@ INSTRUCTIONS = (ROOT / "AGENTS.md").read_text(encoding="utf-8") + (
     "\nThis local interface only handles the fictional school dataset. "
     "Use student_followup tools for facts, reports, explicit actions and feedback. "
     "Do not use terminal, file editing, web, or unrelated tools. "
-    "A chat answer does not save a reviewer decision."
+    "A chat answer does not save a reviewer decision. "
+    "Reply in natural Arabic, usually one to three short sentences. Answer the "
+    "latest request without repeating the entire case list or thresholds unless asked. "
+    "For an explicit action, call student_followup_action and state the actual result. "
+    "The tool supplies an unverified local chat actor when no name was given; "
+    "do not ask for an operator name solely to use it. Never claim queued contact was sent."
 )
 _sessions = {}
 _sessions_lock = threading.Lock()
 gateway_process = None
 gateway_problem = None
+CHAT_ACTOR = "مستخدم المحادثة (هوية غير موثقة)"
 
 
 def dataset_catalog():
@@ -65,15 +71,23 @@ def guided_question(result, answered):
             key = "followup:" + followup["id"]
             if "pending" in followup["outcome"].lower() and key not in answered:
                 return {"id": key, "student_id": case["student_id"],
-                        "text": f"هل تمت متابعة {followup['id']} للطالب {case['student_id']}؟",
-                        "options": ["نعم، وسأوضح النتيجة", "لم تتم بعد", "لا أعرف", "تفصيل آخر"]}
+                        "text": f"المعلم طلب متابعة {case['student_id']} يوم {followup['date']} (رقمها {followup['id']}). هل تمت؟",
+                        "options": ["سجّل أنها تمّت واكتب النتيجة", "سجّل أنها لم تتم بعد", "لا أعرف", "تفصيل آخر"]}
     for item in result["summary"]["missing_attendance"]:
         key = "attendance:" + item["student_id"] + ":" + item["date"]
         if key not in answered:
             return {"id": key, "student_id": item["student_id"],
                     "text": f"ما حالة حضور {item['student_id']} في {item['date']}؟",
-                    "options": ["حاضر", "غائب", "ما زال غير معروف", "تفصيل آخر"]}
+                    "options": ["سجّل حاضر", "سجّل غائب", "ما زال غير معروف", "تفصيل آخر"]}
     return None
+
+
+def review_opening(result):
+    summary = result["summary"]
+    flagged = "، ".join(case["student_id"] for case in result["candidates"]) or "لا أحد"
+    return (f"راجعت {summary['students']} طالبًا للفترة {result['period']['start']} إلى "
+            f"{result['period']['end']}. طلاب يحتاجون متابعة: {flagged}. "
+            f"هناك {len(summary['missing_attendance'])} سجلات حضور تحتاج استكمالًا.")
 
 
 def structured_question(answer):
@@ -136,26 +150,82 @@ def hermes_status():
         return {"ready": False, "message": str(exc)}
 
 
-def chat(message, session_id=None, guided=False, data_file=None, start=None, end=None, answer_to=None):
+def chat(message, session_id=None, guided=False, data_file=None, start=None, end=None,
+         answer_to=None, save_answer=False):
     if not isinstance(message, str) or not message.strip() or len(message) > 4000:
         raise DataError("اكتب رسالة من 1 إلى 4000 حرف")
+    context = (data_file, start, end)
+    with _sessions_lock:
+        known = session_id if isinstance(session_id, str) and session_id in _sessions else None
+        session = dict(_sessions[known]) if known else None
+    if session and session.get("context") != context:
+        raise DataError("تغيّر الملف أو الفترة؛ ابدأ محادثة جديدة للمراجعة")
+    if guided and not session:
+        result = report(data_file, start, end)
+        known = uuid.uuid4().hex
+        question = guided_question(result, [])
+        with _sessions_lock:
+            if len(_sessions) >= 100:
+                _sessions.pop(next(iter(_sessions)))
+            _sessions[known] = {"context": context, "response_id": None,
+                                "answered": [], "history": [], "pending": question}
+        return {"answer": review_opening(result), "session_id": known, "question": question}
+    if answer_to:
+        pending = session.get("pending") if session else None
+        if not guided or not pending or answer_to != pending["id"]:
+            raise DataError("هذا السؤال لم يعد نشطًا؛ ابدأ مراجعة جديدة")
+        result = report(data_file, start, end)
+        action = None
+        request_id = uuid.uuid5(uuid.NAMESPACE_URL, known + ":" + answer_to).hex
+        if answer_to.startswith("attendance:") and message in ("سجّل حاضر", "سجّل غائب"):
+            action = execute(data_file, "record_attendance", CHAT_ACTOR, pending["student_id"],
+                day=answer_to.rsplit(":", 1)[1],
+                status="present" if message == "سجّل حاضر" else "absent", request_id=request_id)
+        elif answer_to.startswith("followup:") and message == "سجّل أنها لم تتم بعد":
+            action = execute(data_file, "resolve_followup", CHAT_ACTOR, pending["student_id"],
+                followup_id=answer_to.split(":", 1)[1], outcome="لم تتم بعد", request_id=request_id)
+        elif answer_to.startswith("followup:") and save_answer is True:
+            action = execute(data_file, "resolve_followup", CHAT_ACTOR, pending["student_id"],
+                followup_id=answer_to.split(":", 1)[1],
+                outcome="تمّت المتابعة: " + message.strip(), request_id=request_id)
+        append_event("dialogue.jsonl", {"session_id": known, "question_id": answer_to,
+            "student_id": pending["student_id"], "answer": message.strip(),
+            "data_file": data_file, "period": {"start": start, "end": end}})
+        answered = session["answered"] + [answer_to]
+        history = session["history"] + [{"question": pending["text"], "answer": message.strip()}]
+        if action:
+            result = report(data_file, start, end)
+            detail = action["details"]
+            if action["action"] == "record_attendance":
+                reply = f"سجّلت حضور {detail['student_id']} في {detail['day']} كـ{'حاضر' if detail['after'] == 'present' else 'غائب'} على النسخة المحلية."
+            else:
+                reply = f"حدّثت متابعة {detail['followup_id']} للطالب {detail['student_id']} إلى: {detail['after']}."
+        else:
+            reply = "دوّنت إجابتك في المراجعة. لم أعدّل سجل الطالب."
+        question = guided_question(result, answered)
+        if not question:
+            reply += " انتهت الأسئلة الحالية؛ يمكنك طلب إجراء أو تقرير من المحادثة."
+        with _sessions_lock:
+            _sessions[known].update(answered=answered, history=history, pending=question)
+        return {"answer": reply, "session_id": known, "question": question, "changed": bool(action)}
+
     status = hermes_status()
     if not status["ready"]:
         raise RuntimeError(status["message"])
-    with _sessions_lock:
-        known = session_id if isinstance(session_id, str) and session_id in _sessions else None
-        previous = _sessions[known]["response_id"] if known else None
-        answered = list(_sessions[known].get("answered", [])) if known else []
-        pending = _sessions[known].get("pending") if known else None
-    if answer_to and (not pending or answer_to != pending["id"]):
-        raise DataError("هذا السؤال لم يعد نشطًا؛ ابدأ مراجعة جديدة")
-    current_report = report(data_file, start, end) if guided else None
-    body = {"model": "hermes-agent", "input": message.strip(), "instructions": INSTRUCTIONS, "store": True}
+    previous = session.get("response_id") if session else None
+    pending = session.get("pending") if session else None
+    context_note = ""
+    if guided:
+        context_note = f"\nDataset: {data_file}; dates: {start} to {end}. "
+        if session and session.get("history"):
+            context_note += "Review answers so far: " + json.dumps(session["history"][-8:], ensure_ascii=False) + ". "
+        if pending:
+            context_note += f"The open UI question is '{pending['text']}', but this message is a separate question or request, not an answer to it. "
+        context_note += "Respond to the user's latest request briefly; do not repeat the overall review."
+    body = {"model": "hermes-agent", "input": message.strip() + context_note,
+            "instructions": INSTRUCTIONS, "store": True}
     if previous:
         body["previous_response_id"] = previous
-    if guided:
-        body["input"] += (f"\nUse {data_file} from {start} to {end}. Summarize relevant evidence. "
-                          "The interface will show the next concrete question as buttons; do not ask an additional question in prose.")
     response = hermes_request("/v1/responses", body, timeout=120)
     answer = "\n".join(
         content.get("text", "")
@@ -168,18 +238,15 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
     response_id = response.get("id")
     if not isinstance(response_id, str) or not response_id:
         raise RuntimeError("Hermes لم يُرجع معرف المحادثة. حاول مرة ثانية.")
-    if answer_to:
-        answered.append(answer_to)
-        append_event("dialogue.jsonl", {"session_id": known, "question_id": answer_to,
-                     "student_id": pending.get("student_id"),
-                     "answer": message.strip(), "data_file": data_file, "period": {"start": start, "end": end}})
-    question = guided_question(current_report, answered) if guided else model_question
+    question = guided_question(report(data_file, start, end), session.get("answered", [])) if guided else model_question
     with _sessions_lock:
         if not known:
             known = uuid.uuid4().hex
         if len(_sessions) >= 100:
             _sessions.pop(next(iter(_sessions)))
-        _sessions[known] = {"response_id": response_id, "answered": answered, "pending": question}
+        _sessions[known] = {"context": context, "response_id": response_id,
+                            "answered": session.get("answered", []) if session else [],
+                            "history": session.get("history", []) if session else [], "pending": question}
     return {"answer": answer, "session_id": known, "question": question}
 
 
@@ -253,7 +320,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/chat":
                 return self._json(200, chat(body.get("message"), body.get("session_id"),
                     body.get("guided", False), body.get("data_file"), body.get("start"),
-                    body.get("end"), body.get("answer_to")))
+                    body.get("end"), body.get("answer_to"), body.get("save_answer", False)))
             if self.path == "/api/report":
                 item = create_report(read_data(body.get("data_file")), body.get("start"),
                                      body.get("end"), body.get("purpose"), policy())

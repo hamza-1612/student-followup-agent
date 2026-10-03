@@ -116,24 +116,26 @@ def register(ctx):
             return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
 
     action_schema = {"name": "student_followup_action",
-        "description": "Execute only an explicitly requested local attendance/follow-up change, register a school day, queue a contact draft, or send email when SMTP and a real dataset recipient are configured. Changes are audited. Never infer an action from analysis alone.",
+        "description": "Execute an explicitly requested attendance/follow-up change, school-day registration, local contact queue, or email with configured address and SMTP. Call this tool for a specific user command in chat and report its actual state. If actor is omitted, an unverified chat operator label is recorded. Never infer an action from analysis alone; queue_contact is not email delivery.",
         "parameters": {"type": "object", "properties": {
             "data_file": {"type": "string"}, "action": {"type": "string", "enum": ["record_attendance", "resolve_followup", "add_school_day", "queue_contact", "send_email"]},
-            "actor": {"type": "string", "description": "Name of the local operator making the explicit request"},
+            "actor": {"type": "string", "description": "Optional operator name; defaults to an unverified local chat user"},
             "student_id": {"type": "string"}, "day": {"type": "string"},
             "status": {"type": "string", "enum": ["present", "absent", "unrecorded"]},
             "followup_id": {"type": "string"}, "outcome": {"type": "string"},
             "recipient_type": {"type": "string", "enum": ["guardian", "student"]},
             "subject": {"type": "string"}, "message": {"type": "string"},
             "request_id": {"type": "string", "description": "Stable ID to prevent duplicate retries"}},
-            "required": ["data_file", "action", "actor"]}}
+            "required": ["data_file", "action"]}}
 
     def action_handler(params, **kwargs):
         del kwargs
         try:
             _project_package()
             from student_followup.actions import execute
-            return json.dumps({"success": True, "action": execute(**params)}, ensure_ascii=False)
+            request = dict(params)
+            request.setdefault("actor", "مستخدم المحادثة (هوية غير موثقة)")
+            return json.dumps({"success": True, "action": execute(**request)}, ensure_ascii=False)
         except (TypeError, ValueError, OSError) as exc:
             return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
 

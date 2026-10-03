@@ -121,7 +121,7 @@ class WebAppTests(unittest.TestCase):
         calls = []
 
         def fake_hermes(path, body=None, timeout=3):
-            calls.append(path)
+            calls.append((path, body))
             if path == "/v1/toolsets":
                 return {"object": "list", "platform": "api_server", "data": [
                     {"name": "student_followup", "enabled": True,
@@ -136,10 +136,37 @@ class WebAppTests(unittest.TestCase):
             first = json.loads(self.fetch("/api/chat", {**context, "message": "ابدأ المراجعة"})[2])
             self.assertEqual(first["question"]["id"], "followup:F-001")
             self.assertEqual(len(first["question"]["options"]), 4)
-            second = json.loads(self.fetch("/api/chat", {**context, "message": "لم تتم بعد",
+            self.assertEqual(calls, [])
+            second = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل أنها لم تتم بعد",
                 "session_id": first["session_id"], "answer_to": "followup:F-001"})[2])
-            self.assertTrue(second["question"]["id"].startswith("attendance:"))
-            self.assertEqual(len(storage.events("dialogue.jsonl")), 1)
+            self.assertEqual(second["question"]["id"], "attendance:S-004:2026-09-10")
+            self.assertTrue(second["changed"])
+            third = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل غائب",
+                "session_id": first["session_id"], "answer_to": second["question"]["id"]})[2])
+            self.assertEqual(third["question"]["id"], "attendance:S-006:2026-09-11")
+            self.assertTrue(third["changed"])
+            attendance = storage.read_data(context["data_file"])["attendance"]
+            self.assertEqual(next(row["status"] for row in attendance if row["student_id"] == "S-004"
+                                  and row["date"] == "2026-09-10"), "absent")
+            self.assertEqual(len(storage.events("actions.jsonl")), 2)
+            question = json.loads(self.fetch("/api/chat", {**context, "message": "ليش S-006؟",
+                "session_id": first["session_id"]})[2])
+            self.assertEqual(question["question"]["id"], third["question"]["id"])
+            self.assertIn("سجّل غائب", calls[-1][1]["input"])
+            self.assertNotIn("Summarize relevant evidence", calls[-1][1]["input"])
+            self.assertEqual(len(storage.events("dialogue.jsonl")), 2)
+
+    def test_guided_followup_details_are_saved_only_after_explicit_record_choice(self):
+        context = {"guided": True, "data_file": "data/fictional_school.json",
+                   "start": "2026-09-07", "end": "2026-09-11"}
+        first = json.loads(self.fetch("/api/chat", {**context, "message": "ابدأ المراجعة"})[2])
+        answer = json.loads(self.fetch("/api/chat", {**context,
+            "message": "تواصل المعلم وتم الاتفاق على موعد جديد", "session_id": first["session_id"],
+            "answer_to": "followup:F-001", "save_answer": True})[2])
+        self.assertTrue(answer["changed"])
+        followup = storage.read_data(context["data_file"])["followups"][0]
+        self.assertIn("تمّت المتابعة: تواصل المعلم", followup["outcome"])
+        self.assertEqual(storage.events("actions.jsonl")[0]["action"], "resolve_followup")
 
     def test_report_feedback_and_local_action_http_flow(self):
         context = {"data_file": "data/fictional_school.json", "start": "2026-09-10", "end": "2026-09-10"}

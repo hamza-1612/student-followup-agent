@@ -127,10 +127,12 @@ or shared-school deployment. The operator name is an audit label, not authentica
   observed attendance; it does not invent absences. The `school_days` calendar
   catches an entire day with no attendance rows. The dashboard lists each
   student and date with `unrecorded` attendance or a missing row.
-- Click **ابدأ مراجعة تفاعلية** in the chat. The agent explains evidence and
-  presents one question with clickable options, starting with F-001's pending
-  outcome when relevant. Clicking an option answers the question; it is not
-  itself an attendance change. A free-text answer is available.
+- Click **ابدأ مراجعة تفاعلية** in the chat for a short overview and one
+  concrete question, starting with F-001's pending outcome when relevant.
+  Buttons labeled **سجّل** explicitly update the local attendance or follow-up
+  overlay and write an audit entry under an unverified chat-user label. Other
+  answers only save review context. A separate free-text question does not
+  accidentally answer the open review question.
 - Enter a purpose under **تقارير حسب الطلب** to save an on-demand daily or
   range report in ignored `outputs/reports.jsonl`. The report includes actual
   attendance and the list needing completion. The Hermes report tool lets the
@@ -142,6 +144,10 @@ or shared-school deployment. The operator name is an audit label, not authentica
   school day before adding attendance on it. A queued contact has state
   `queued_local` and is **not sent**. The same explicit request needs no second
   approval. The Hermes action tool can handle the same specific requests in chat.
+  In chat, the tool uses an honest unverified operator label when no name is
+  supplied, and an explicit request runs without another operator-name prompt.
+  A send request cannot deliver from the fictional fixture without a recipient
+  address and SMTP configuration; it is not silently converted to a local queue.
 - Actual email requires `guardian_email` or `student_email` in the student row,
   and `STUDENT_FOLLOWUP_SMTP_HOST`, `STUDENT_FOLLOWUP_SMTP_USER`,
   `STUDENT_FOLLOWUP_SMTP_PASSWORD`, `STUDENT_FOLLOWUP_SMTP_FROM` (optionally
