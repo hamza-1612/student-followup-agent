@@ -203,7 +203,7 @@ class AnalysisTests(unittest.TestCase):
         result = json.loads(tool({"data_file": "data/fictional_school.json", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertTrue(result["success"])
         self.assertEqual(result["result"]["summary"]["candidates"], 7)
-        rejected = json.loads(tool({"data_file": "../project_sources/01-BRIEF.md", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
+        rejected = json.loads(tool({"data_file": "../README.md", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertFalse(rejected["success"])
         daily = json.loads(ctx.registrations["student_followup_report"]["handler"]({
             "data_file": "data/fictional_school.json", "period_start": "2026-09-10",

@@ -153,8 +153,8 @@ messages; it omits external email bodies and addresses.
 JSON inputs are confined to `data/`. The analysis uses the same tested Python
 module as the CLI. For "the existing file" and "the whole period," Hermes
 should discover the dataset and use its full recorded attendance date range.
-`AGENTS.md` instructs Hermes to follow `BRIEF.md` and
-`AGENT.md`, including the school-only conversation scope. Start a fresh chat
+`AGENTS.md` defines the school-only conversation scope used by the web
+chat. Start a fresh chat
 after pulling instruction changes; an existing chat may keep its old context.
 For example, a request for a cooking recipe should receive a brief school-scope
 reply without a recipe. This is a model instruction, not a guaranteed hard
