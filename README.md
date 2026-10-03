@@ -5,57 +5,6 @@ attendance, assessment, and follow-up data, asks guided questions, and supports
 audited local actions. `BRIEF.md` records project decisions;
 `AGENT.md` records intended agent behavior. No Academix connection is needed.
 
-## Judge quick start (Windows PowerShell)
-
-This path lets a judge run the **working agent and source code** from a fresh
-checkout. Allow about five minutes **after** Git, Python 3.10+, and Hermes
-with a configured model/provider are installed. Initial installation,
-model sign-in, and downloads depend on the judge's machine and connection.
-The app itself has no third-party Python package requirements. All included
-student records are fictional.
-
-```powershell
-git clone https://github.com/hamza-1612/student-followup-agent.git
-cd student-followup-agent
-$env:HERMES_ENABLE_PROJECT_PLUGINS = "true"
-$enabledJson = hermes config get plugins.enabled --json 2>$null
-$enabled = if ($LASTEXITCODE -eq 0) { @($enabledJson | ConvertFrom-Json) } else { @() }
-$enabled = @($enabled | Where-Object { $_ })
-if ("student-followup" -notin $enabled) { $enabled += "student-followup" }
-hermes config set plugins.enabled (ConvertTo-Json -InputObject $enabled -Compress)
-python -m web_app
-```
-
-Open **http://127.0.0.1:8000**. The dashboard shows the fictional cases;
-the chat panel uses the locally configured Hermes model and the repository's
-`student_followup` tools. In chat, try:
-
-> راجع الفترة من 2026-09-07 إلى 2026-09-11. ما حالة يوسف سامر؟
-> ما حالات الحضور غير المسجلة؟ واقترح خطوة لكل حالة بعد مراجعة المتابعة السابقة.
-
-Then select a case and inspect its evidence and suggested step. Try a specific
-question about a student's missing attendance: the agent should ask for
-verification rather than label an unrecorded day as an absence. Record a review
-decision from the form if desired; any record edit or demo send requires an
-explicit user action. The demo send writes local history only and does not
-deliver to a real recipient. Stop the server with **Ctrl+C**.
-
-**Quick code check:** in another PowerShell window in the repository, run
-`python -m unittest discover -s tests -v`. To run the evidence analyzer
-without Hermes or a browser, use:
-
-```powershell
-python -m student_followup --data data/fictional_school.json --start 2026-09-07 --end 2026-09-11
-```
-
-That last command verifies the deterministic analysis; it does **not** run
-the conversational agent. If `python` is unavailable on Windows, use `py`.
-If Hermes is not on PATH, see [Run with Hermes](#run-with-hermes-once-installed-and-configured).
-The dashboard can also run with `python -m web_app --no-hermes`, but its chat
-will be unavailable. See [Local browser interface](#local-browser-interface-windows)
-for gateway and plugin troubleshooting, and [Demo and measurement](#demo-and-measurement)
-for how to report measured time and token use.
-
 ## Run the deterministic analyzer (Windows PowerShell)
 
 From this folder with Python 3.10 or newer installed:
