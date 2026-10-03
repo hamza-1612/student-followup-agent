@@ -359,7 +359,7 @@ class WebAppTests(unittest.TestCase):
         context = {"data_file": "data/fictional_school.json", "start": "2026-09-10", "end": "2026-09-10"}
         status, _, payload = self.fetch("/api/report", {**context, "purpose": "تقرير الغياب اليومي"})
         self.assertEqual(status, 200)
-        self.assertEqual(len(json.loads(payload)["report"]["missing_attendance"]), 1)
+        self.assertEqual(len(json.loads(payload)["report"]["missing_attendance"]), 3)
         feedback = {**context, "start": "2026-09-07", "end": "2026-09-11",
                     "student_id": "S-006", "label": "confirmed", "note": "Teacher confirmed score drop"}
         self.assertEqual(self.fetch("/api/feedback", feedback)[0], 200)
@@ -367,8 +367,9 @@ class WebAppTests(unittest.TestCase):
         action = {"data_file": context["data_file"], "action": "record_attendance", "actor": "Teacher",
                   "student_id": "S-004", "day": "2026-09-10", "status": "present"}
         self.assertEqual(self.fetch("/api/actions", action)[0], 200)
-        self.assertEqual(json.loads(self.fetch("/api/report", {**context, "purpose": "تقرير الغياب اليومي"})[2])
-                         ["report"]["missing_attendance"], [])
+        remaining = json.loads(self.fetch("/api/report", {**context, "purpose": "تقرير الغياب اليومي"})[2])
+        self.assertEqual({row["student_id"] for row in remaining["report"]["missing_attendance"]},
+                         {"S-022", "S-047"})
 
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:

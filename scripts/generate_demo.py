@@ -18,6 +18,15 @@ def build():
                  "guardian_name": f"ولي أمر {name}", "teacher_name": "معلم الصف"}
                 for i, name in enumerate(names, 1)]
     days = ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11"]
+    # An unrecorded status is a request to verify attendance, never an absence.
+    unrecorded = {
+        ("S-004", "2026-09-10"), ("S-006", "2026-09-11"),
+        ("S-033", "2026-09-09"), ("S-009", "2026-09-07"),
+        ("S-014", "2026-09-08"), ("S-018", "2026-09-09"),
+        ("S-022", "2026-09-10"), ("S-027", "2026-09-11"),
+        ("S-039", "2026-09-07"), ("S-044", "2026-09-08"),
+        ("S-047", "2026-09-10"),
+    }
     attendance = []
     for student in students:
         sid = student["student_id"]
@@ -25,11 +34,7 @@ def build():
             status = "present"
             if sid in {"S-002", "S-006", "S-031", "S-034", "S-035"} and day in {"2026-09-08", "2026-09-10"}:
                 status = "absent"
-            if sid == "S-004" and day == "2026-09-10":
-                status = "unrecorded"
-            if sid == "S-006" and day == "2026-09-11":
-                status = "unrecorded"
-            if sid == "S-033" and day == "2026-09-09":
+            if (sid, day) in unrecorded:
                 status = "unrecorded"
             attendance.append({"student_id": sid, "date": day, "status": status})
     assessments = []

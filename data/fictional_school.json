@@ -512,7 +512,7 @@
     {
       "student_id": "S-009",
       "date": "2026-09-07",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-009",
@@ -642,7 +642,7 @@
     {
       "student_id": "S-014",
       "date": "2026-09-08",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-014",
@@ -747,7 +747,7 @@
     {
       "student_id": "S-018",
       "date": "2026-09-09",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-018",
@@ -852,7 +852,7 @@
     {
       "student_id": "S-022",
       "date": "2026-09-10",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-022",
@@ -982,7 +982,7 @@
     {
       "student_id": "S-027",
       "date": "2026-09-11",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-028",
@@ -1262,7 +1262,7 @@
     {
       "student_id": "S-039",
       "date": "2026-09-07",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-039",
@@ -1392,7 +1392,7 @@
     {
       "student_id": "S-044",
       "date": "2026-09-08",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-044",
@@ -1477,7 +1477,7 @@
     {
       "student_id": "S-047",
       "date": "2026-09-10",
-      "status": "present"
+      "status": "unrecorded"
     },
     {
       "student_id": "S-047",

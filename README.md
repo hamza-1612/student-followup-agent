@@ -22,11 +22,11 @@ Arabic report listing **all** candidates and unresolved cases. For complete
 machine-readable output, add `--json` to the analysis command.
 
 Expected counts for the included sample: 50 fictional students with Arabic
-names; 250 dated attendance records; 7 review candidates and 2 unresolved
-cases. These are fixture checks, **not educational effectiveness claims**.
-For 2026-09-07 through 2026-09-09, the actual present counts are 50, 45,
-and 49 by day. There are 150 attendance **records** in that period;
-five are `absent` and one is `unrecorded`.
+names; 250 dated attendance records; 7 review candidates and 10 unresolved
+cases (11 students have an unrecorded attendance day, including one candidate). These are fixture checks, **not educational effectiveness claims**.
+For 2026-09-07 through 2026-09-09, the actual present counts are 48, 43,
+and 48 by day. There are 150 attendance **records** in that period;
+five are `absent` and six are `unrecorded`.
 S-004's unrecorded attendance is not counted as absence. Every candidate has
 observed facts, a source, and follow-ups recorded through the period end.
 The fixture uses repeated baseline scores across students by design; equal
@@ -171,8 +171,11 @@ or shared-school deployment. The operator name is an audit label, not authentica
 These actions are a **single-operator local demo**. Before connecting real
 student records, add school identity/permissions, a secure data source, contact
 verification, and the school's actual communication channel. The local tool
-does not modify Academix. Review the ignored `outputs/` directory if you need
-to reset the local demo state; do not commit it.
+does not modify Academix. To reset the local demo records and see the updated fixture, stop the app and remove
+`outputs/datasets/fictional_school.json`. This discards local changes to the
+student records. The audit logs under `outputs/` stay in place; clear them
+separately only if you also want to reset the demonstration history. Do not
+commit `outputs/`.
 
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers six tools:
