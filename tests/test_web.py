@@ -6,6 +6,7 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+from types import SimpleNamespace
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
@@ -180,6 +181,7 @@ class WebAppTests(unittest.TestCase):
 
         with patch.dict(os.environ, {}, clear=True), \
              patch.object(launcher, "hermes_executable", return_value="hermes.exe"), \
+             patch.object(launcher, "hermes_api_key", return_value="stored-local-test-key-12345"), \
              patch.object(launcher, "port_open", return_value=False), \
              patch.object(launcher.subprocess, "Popen", side_effect=spawn), \
              patch.object(launcher, "serve", side_effect=KeyboardInterrupt):
@@ -188,6 +190,27 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(child.environment["HERMES_ENABLE_PROJECT_PLUGINS"], "true")
             self.assertEqual(child.environment["API_SERVER_ENABLED"], "true")
             self.assertEqual(os.environ["API_SERVER_KEY"], child.environment["API_SERVER_KEY"])
+            self.assertEqual(child.environment["API_SERVER_KEY"], "stored-local-test-key-12345")
+
+    def test_launcher_saves_key_in_hermes_profile_without_printing_it(self):
+        calls = []
+
+        def run(command, **options):
+            calls.append(command)
+            self.assertTrue(options["capture_output"])
+            self.assertNotIn("API_SERVER_KEY", options["env"])
+            if command[1:4] == ["config", "get", "API_SERVER_KEY"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="Config key not set")
+            if command[1:4] == ["config", "get", "API_SERVER_ENABLED"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="Config key not set")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.dict(os.environ, {"API_SERVER_KEY": "stale-process-key"}), \
+             patch.object(launcher.subprocess, "run", side_effect=run):
+            key = launcher.hermes_api_key("hermes.exe")
+        self.assertGreaterEqual(len(key), 32)
+        self.assertIn(["hermes.exe", "config", "set", "API_SERVER_KEY", key], calls)
+        self.assertIn(["hermes.exe", "config", "set", "API_SERVER_ENABLED", "true"], calls)
 
     def test_gateway_exit_and_occupied_port_have_specific_status(self):
         class Stopped:

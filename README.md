@@ -92,21 +92,26 @@ python -m web_app
 ```
 
 Use `py -m web_app` if Python is exposed as `py`. Open
-`http://127.0.0.1:8000` in your browser. This command starts a local Hermes
-gateway via `hermes gateway run` with a temporary API key when it finds Hermes,
-and stops that child
-process when you press Ctrl+C. The key stays in the local processes and never
-goes to the browser. The interface and Hermes API bind to `127.0.0.1` only.
+`http://127.0.0.1:8000` in your browser. On the first run, this command uses
+`hermes config set` to save a random `API_SERVER_KEY` and turn on
+`API_SERVER_ENABLED` in the local Hermes profile. Later runs reuse that key, so
+the profile-scoped gateway can read it. It starts a local gateway via
+`hermes gateway run` when port 8642 is free, and stops that child process when
+you press Ctrl+C. The key stays on the local machine and never goes to the
+browser. The interface and Hermes API bind to `127.0.0.1` only.
 If Hermes is unavailable or its project plugin is not enabled, the dashboard
 and review form still work, while the chat panel explains the connection issue.
 If the chat remains offline, read the status pill and the PowerShell output;
 an early gateway exit code or an occupied port is reported explicitly. Wait
 for gateway startup before trying the chat.
 To intentionally use only the dashboard, run `python -m web_app --no-hermes`.
-If another Hermes API gateway is already using port 8642, close it before
-starting the one-command interface, or provide its matching `API_SERVER_KEY`
-as an environment variable. The included dataset has no recipient email addresses,
+If Hermes already serves the API on port 8642, the interface uses the profile's
+configured key to connect. The included dataset has no recipient email addresses,
 so no real message can be sent with the fixture.
+If a Hermes gateway is running in the background but port 8642 is not open,
+stop the UI, run `& "$env:LOCALAPPDATA\hermes\bin\hermes.exe" gateway stop`,
+then run `python -m web_app` again. This temporarily stops Hermes's background
+messaging and scheduled jobs; `hermes gateway start` restores it later.
 
 The interface is a small Python standard-library HTTP server and static
 HTML/CSS/JavaScript, with a server-side bridge to Hermes' local Responses API.
