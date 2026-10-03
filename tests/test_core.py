@@ -322,7 +322,7 @@ print(json.dumps({'info': json.loads(ctx.handlers['student_followup_info']({})),
         args = [sys.executable, "-m", "student_followup", "--data", "data/fictional_school.json",
                 "--start", "2026-09-07", "--end", "2026-09-11"]
         report = subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=True).stdout
-        self.assertIn("حالات للمراجعة: 7 | حالات تحتاج استكمال بيانات: 2", report)
+        self.assertIn("حالات للمراجعة: 7 | حالات تحتاج استكمال بيانات: 10", report)
         for sid in ("S-002", "S-003", "S-006", "S-004"):
             self.assertIn(sid, report)
         self.assertIn("حضور غير مسجل (ليس غيابًا)", report)

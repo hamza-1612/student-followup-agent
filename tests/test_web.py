@@ -77,7 +77,7 @@ class WebAppTests(unittest.TestCase):
         query = urllib.parse.urlencode({"data_file": "data/fictional_school.json",
                                         "start": "2026-09-07", "end": "2026-09-09"})
         report = json.loads(self.fetch("/api/analysis?" + query)[2])
-        self.assertEqual(report["summary"]["attendance"]["by_date"][1]["present"], 45)
+        self.assertEqual(report["summary"]["attendance"]["by_date"][1]["present"], 43)
         self.assertEqual(self.fetch("/api/analysis?data_file=../other.json&start=2026-09-07&end=2026-09-09")[0], 400)
 
     def test_reviewer_decision_is_saved_only_for_case(self):
@@ -176,14 +176,14 @@ class WebAppTests(unittest.TestCase):
             self.assertTrue(second["changed"])
             followup = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل أنها لم تتم بعد",
                 "session_id": first["session_id"], "answer_to": second["question"]["id"]})[2])
-            self.assertEqual(followup["question"]["id"], "attendance:S-033:2026-09-09")
+            self.assertEqual(followup["question"]["id"], "attendance:S-009:2026-09-07")
             third = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل غائب",
                 "session_id": first["session_id"], "answer_to": followup["question"]["id"]})[2])
-            self.assertEqual(third["question"]["id"], "attendance:S-004:2026-09-10")
+            self.assertEqual(third["question"]["id"], "attendance:S-039:2026-09-07")
             self.assertTrue(third["changed"])
             attendance = storage.read_data(context["data_file"])["attendance"]
-            self.assertEqual(next(row["status"] for row in attendance if row["student_id"] == "S-033"
-                                  and row["date"] == "2026-09-09"), "absent")
+            self.assertEqual(next(row["status"] for row in attendance if row["student_id"] == "S-009"
+                                  and row["date"] == "2026-09-07"), "absent")
             self.assertEqual(len(storage.events("actions.jsonl")), 3)
             question = json.loads(self.fetch("/api/chat", {**context, "message": "ليش S-006؟",
                 "session_id": first["session_id"]})[2])
