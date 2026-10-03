@@ -116,7 +116,7 @@ def register(ctx):
             return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
 
     action_schema = {"name": "student_followup_action",
-        "description": "Execute an explicitly chosen attendance/follow-up change, school-day registration, or contact. send_demo records a simulated sent message in the student's communication history after the user has reviewed its draft; it does not deliver externally. If actor is omitted, an unverified chat operator label is recorded.",
+        "description": "Execute an explicitly chosen attendance/follow-up change, school-day registration, or contact. send_demo records the reviewed message in the student's local communication history after the user chooses to send it; it does not deliver externally. If actor is omitted, an unverified chat operator label is recorded.",
         "parameters": {"type": "object", "properties": {
             "data_file": {"type": "string"}, "action": {"type": "string", "enum": ["record_attendance", "resolve_followup", "add_school_day", "queue_contact", "send_email", "send_demo"]},
             "actor": {"type": "string", "description": "Optional operator name; defaults to an unverified local chat user"},

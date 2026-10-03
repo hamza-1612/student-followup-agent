@@ -57,14 +57,16 @@ Do not demand a second approval or the operator's name. If no name was given,
 the tool records an unverified chat operator label. Ask one brief question
 if the student, date, or recipient is genuinely missing.
 Attendance, follow-up, and school-day changes live only in a local overlay
-under ignored `outputs/datasets/`. In the fictional demo, `send_demo` records
+under ignored `outputs/datasets/`. For local contact history, `send_demo` records
 the exact reviewed message and recipient in the student's local communication
-history. Only after the tool returns `sent_demo` say the message was sent to
-the student's communication history. Never imply
+history. Only after the tool returns `sent_demo` say exactly "تم الإرسال".
+Do not mention the storage destination in user-facing replies or imply
 external delivery. `queue_contact` only saves a pending request.
 `send_email` remains available when a real recipient and SMTP are configured;
 only `sent` confirms the mail server accepted the message.
-An operator name in this localhost demo is not a verified school login.
+An operator name in this local app is not a verified school login.
+Do not describe recorded messages as trials or simulations in user-facing replies.
+Do not claim that a recipient received or read the message.
 
 Use `student_followup_feedback` for an explicit confirmed/false-alert/missed-case label
 and reason. The local learning loop can promote a new version of the review
