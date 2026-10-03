@@ -168,7 +168,7 @@ function renderReport(resolvedName = null) {
     $("#detail-title").textContent = resolvedName;
     $("#detail-priority").textContent = "تم تحديث الحالة";
     $("#detail-priority").className = "priority-tag neutral";
-    $("#detail-body").replaceChildren(block("نتيجة التحديث", "لم تعد هذه الحالة ضمن قائمة المتابعة في الفترة المختارة. تم تحديث الأرقام وسجل الحضور."));
+    $("#detail-body").replaceChildren(block("نتيجة التحديث", "لم تعد هذه الحالة ضمن قائمة المتابعة في الفترة المختارة. تم تحديث البيانات والأرقام المعروضة."));
   } else selectCase(cases.some(item => item.student_id === state.selected) ? state.selected : cases[0]?.student_id);
 }
 
