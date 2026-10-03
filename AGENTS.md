@@ -111,6 +111,10 @@ For a missing attendance status, use
 `{"type":"record_attendance","student_id":"...","date":"YYYY-MM-DD"}`.
 Choose the actual ID and date from the current tool result. The interface
 validates them and keeps this metadata out of the displayed question.
+If the user answers that a missing attendance day was present or absent,
+first ask whether to record that status. Their answer to the factual question
+does not itself authorize a record change. Only an explicit choice to save it
+updates the attendance record; if they decline, leave it unrecorded.
 The interface renders the model's choices as buttons. For a separate user question or command, answer
 only that turn in one to three short Arabic sentences and use tools for any
 explicit action. Do not repeat the whole period, all cases, thresholds or

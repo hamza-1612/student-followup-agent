@@ -197,10 +197,26 @@ def model_question(question, case=None, result=None):
             row["student_id"] == sid and row["date"] == action.get("date")
             for row in result["summary"]["missing_attendance"]):
             return {**question, "id": f"attendance:{sid}:{action['date']}", "student_id": sid}
+    if case and result and "حضور" in question["text"] and any(
+        attendance_answer(option) for option in question["options"]):
+        missing = [row for row in result["summary"]["missing_attendance"]
+                   if row["student_id"] == case["student_id"]]
+        if len(missing) == 1:
+            return {**question, "id": f"attendance:{case['student_id']}:{missing[0]['date']}",
+                    "student_id": case["student_id"]}
     if any(option.startswith("سجّل") for option in question["options"]):
         return None  # Do not show a save button without a validated target record.
     return {**question, "id": "model:" + uuid.uuid4().hex,
             "student_id": case["student_id"] if case else None}
+
+
+def attendance_answer(message):
+    plain = re.sub(r"[\u064b-\u065f\u0670]", "", message.strip())
+    if re.fullmatch(r"(?:كان|كانت)?\s*حاضر(?:ا|ة)?", plain):
+        return "present"
+    if re.fullmatch(r"(?:كان|كانت)?\s*غائب(?:ا|ة)?", plain):
+        return "absent"
+    return None
 
 
 def model_response(message, previous=None, context_note=""):
@@ -285,6 +301,38 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
     if session and session.get("context") != context:
         raise DataError("تغيّر الملف أو الفترة؛ ابدأ محادثة جديدة للمراجعة")
     choice_case_id = None
+    if answer_to and answer_to.startswith("confirm_attendance:"):
+        pending = session.get("pending") if session else None
+        if not pending or pending.get("id") != answer_to:
+            raise DataError("هذا السؤال لم يعد نشطًا؛ اطلب مراجعة الحالة مرة أخرى")
+        if message not in pending["options"]:
+            raise DataError("اختر تسجيل الحضور أو ترك السجل كما هو")
+        result = report(data_file, start, end)
+        case = case_by_id(result, data_file, pending["student_id"])
+        name = case["alias"]
+        day = pending["day"]
+        status = pending["status"]
+        if message == "نعم، سجّلها":
+            missing = any(row["student_id"] == pending["student_id"] and row["date"] == day
+                          for row in result["summary"]["missing_attendance"])
+            if not missing:
+                raise DataError("تغيّر سجل الحضور لهذا اليوم؛ راجعه مرة أخرى قبل التعديل")
+            action = execute(data_file, "record_attendance", CHAT_ACTOR, pending["student_id"],
+                             day=day, status=status,
+                             request_id=uuid.uuid5(uuid.NAMESPACE_URL, known + ":" + answer_to).hex)
+            reply = f"سجّلت {name} {'حاضرًا' if status == 'present' else 'غائبًا'} يوم {day}."
+        else:
+            action = None
+            reply = f"تمام، تركت سجل حضور {name} ليوم {day} دون تعديل."
+        append_event("dialogue.jsonl", {"session_id": known, "question_id": answer_to,
+            "student_id": pending["student_id"], "answer": message,
+            "data_file": data_file, "period": {"start": start, "end": end}})
+        with _sessions_lock:
+            _sessions[known]["pending"] = None
+            _sessions[known]["history"] = session.get("history", []) + [
+                {"question": pending["text"], "answer": message}]
+        return {"answer": reply, "session_id": known, "question": None,
+                "changed": bool(action)}
     if answer_to and session and (session.get("pending") or {}).get("id") == answer_to and answer_to.startswith("send:"):
         result = report(data_file, start, end)
         sid = session["pending"]["student_id"]
@@ -340,6 +388,25 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         if not pending or answer_to != pending["id"]:
             raise DataError("هذا السؤال لم يعد نشطًا؛ ابدأ مراجعة جديدة")
         result = report(data_file, start, end)
+        if answer_to.startswith("attendance:") and message in pending.get("options", []):
+            status = attendance_answer(message)
+            if status:
+                day = answer_to.rsplit(":", 1)[1]
+                case = case_by_id(result, data_file, pending["student_id"])
+                if not any(row["student_id"] == pending["student_id"] and row["date"] == day
+                           for row in result["summary"]["missing_attendance"]):
+                    raise DataError("تغيّر سجل الحضور لهذا اليوم؛ راجعه مرة أخرى")
+                question = {"id": f"confirm_attendance:{pending['student_id']}:{day}:{status}",
+                            "student_id": pending["student_id"], "day": day, "status": status,
+                            "text": f"هل تريد تسجيل {case['alias']} {'حاضرًا' if status == 'present' else 'غائبًا'} يوم {day} في السجل؟",
+                            "options": ["نعم، سجّلها", "لا، اترك السجل كما هو"]}
+                append_event("dialogue.jsonl", {"session_id": known, "question_id": answer_to,
+                    "student_id": pending["student_id"], "answer": message.strip(),
+                    "data_file": data_file, "period": {"start": start, "end": end}})
+                with _sessions_lock:
+                    _sessions[known]["pending"] = question
+                return {"answer": "فهمت إجابتك، ولسه ما عدّلت سجل الحضور.",
+                        "session_id": known, "question": question, "changed": False}
         action = None
         request_id = uuid.uuid5(uuid.NAMESPACE_URL, known + ":" + answer_to).hex
         if answer_to.startswith("attendance:") and message in ("سجّل حاضر", "سجّل غائب"):
@@ -372,7 +439,10 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         question = guided_question(result, answered) if guided else None
         response_id = session.get("response_id")
         if not guided and current_case and os.environ.get("API_SERVER_KEY"):
-            note = ("\nThe preceding user answer was saved as the following outcome. "
+            update_note = ("The requested record change was saved. " if action else
+                           "The user answered a question; no student record was changed. "
+                           "An unrecorded attendance day is still unknown in the register. ")
+            note = ("\n" + update_note +
                     "This is the current, authoritative case state: "
                     + case_evidence(current_case, data_file)
                     + "\nDecide whether a DIFFERENT useful step or missing fact now needs attention. "
