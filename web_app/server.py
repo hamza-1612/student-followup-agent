@@ -36,7 +36,11 @@ INSTRUCTIONS = (ROOT / "AGENTS.md").read_text(encoding="utf-8") + (
     "do not ask for an operator name solely to use it. For a contact request, "
     "show a draft and let the person choose whether to send it in the local demo. "
     "A sent_demo state means saved to the student's communication history; "
-    "never imply external delivery. Do not volunteer implementation details."
+    "never imply external delivery. Do not volunteer implementation details. "
+    "After a case answer or a saved follow-up outcome, decide from the latest "
+    "evidence whether a next step is useful. If so, provide one contextual "
+    "[QUESTION] block with short choices; otherwise do not add a question. "
+    "Do not repeat a completed contact merely because it is a default option."
 )
 _sessions = {}
 _sessions_lock = threading.Lock()
@@ -154,17 +158,6 @@ def send_question(case, recipient, draft=None):
             "options": ["إرسال الرسالة", "تعديل الرسالة", "إلغاء"]}
 
 
-def next_question(case):
-    options = []
-    if case["attendance"]["unrecorded"] or case["attendance"]["missing_record_dates"]:
-        options.append("استكمال الحضور")
-    if any("pending" in f["outcome"].lower() for f in case["previous_followups"]):
-        options.append("تحديث المتابعة السابقة")
-    options += ["مراسلة ولي الأمر", "مراسلة الطالب", "مراسلة المعلم", "لا إجراء الآن"]
-    return {"id": "next:" + case["student_id"], "student_id": case["student_id"],
-            "text": f"ما الخطوة المناسبة مع {case['alias']}؟", "options": options}
-
-
 def structured_question(answer):
     match = re.search(r"\[QUESTION\](.*?)\[/QUESTION\]", answer, re.DOTALL)
     if not match:
@@ -178,9 +171,65 @@ def structured_question(answer):
                 for option in question["options"])):
             raise ValueError("invalid question")
         return (answer[:match.start()] + answer[match.end():]).strip(), {
-            "text": question["text"][:240], "options": question["options"]}
+            "text": question["text"][:240], "options": question["options"],
+            "action": question.get("action")}
     except (KeyError, ValueError, TypeError):
         return answer, None
+
+
+def model_question(question, case=None, result=None):
+    if not question:
+        return None
+    if not case and result:
+        named = [row for row in result["candidates"] + result["unresolved"]
+                 if row["alias"] in question["text"]]
+        if len(named) == 1:
+            case = named[0]
+    action = question.pop("action", None)
+    if isinstance(action, dict) and result:
+        sid = action.get("student_id")
+        if action.get("type") == "resolve_followup" and any(
+            f["id"] == action.get("followup_id") and "pending" in f["outcome"].lower()
+            for row in result["candidates"] + result["unresolved"]
+            if row["student_id"] == sid for f in row["previous_followups"]):
+            return {**question, "id": "followup:" + action["followup_id"], "student_id": sid}
+        if action.get("type") == "record_attendance" and any(
+            row["student_id"] == sid and row["date"] == action.get("date")
+            for row in result["summary"]["missing_attendance"]):
+            return {**question, "id": f"attendance:{sid}:{action['date']}", "student_id": sid}
+    if any(option.startswith("سجّل") for option in question["options"]):
+        return None  # Do not show a save button without a validated target record.
+    return {**question, "id": "model:" + uuid.uuid4().hex,
+            "student_id": case["student_id"] if case else None}
+
+
+def model_response(message, previous=None, context_note=""):
+    body = {"model": "hermes-agent", "input": message.strip() + context_note,
+            "instructions": INSTRUCTIONS, "store": True}
+    if previous:
+        body["previous_response_id"] = previous
+    response = hermes_request("/v1/responses", body, timeout=120)
+    answer = "\n".join(
+        content.get("text", "")
+        for item in response.get("output", []) if item.get("type") == "message"
+        for content in item.get("content", []) if content.get("type") == "output_text"
+    ).strip()
+    answer, question = structured_question(answer)
+    if not answer:
+        raise RuntimeError("Hermes لم يُرجع ردًا نصيًا. حاول مرة ثانية.")
+    response_id = response.get("id")
+    if not isinstance(response_id, str) or not response_id:
+        raise RuntimeError("Hermes لم يُرجع معرف المحادثة. حاول مرة ثانية.")
+    return answer, question, response_id
+
+
+def case_evidence(case, data_file):
+    if not case:
+        return ""
+    details = {key: case.get(key) for key in
+               ("alias", "attendance", "alerts", "previous_followups")}
+    details["recent_actions"] = case_context(data_file, case["student_id"], limit=8)
+    return json.dumps(details, ensure_ascii=False)
 
 
 def hermes_request(path, body=None, timeout=3):
@@ -235,7 +284,8 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         session = dict(_sessions[known]) if known else None
     if session and session.get("context") != context:
         raise DataError("تغيّر الملف أو الفترة؛ ابدأ محادثة جديدة للمراجعة")
-    if answer_to and session and (session.get("pending") or {}).get("id") == answer_to and answer_to.startswith(("next:", "send:")):
+    choice_case_id = None
+    if answer_to and session and (session.get("pending") or {}).get("id") == answer_to and answer_to.startswith("send:"):
         result = report(data_file, start, end)
         sid = session["pending"]["student_id"]
         case = case_by_id(result, data_file, sid)
@@ -243,31 +293,7 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
             raise DataError("تغيّرت حالة الطالب؛ اطلب مراجعتها مرة أخرى")
         pending = session["pending"]
         changed = False
-        if answer_to.startswith("next:"):
-            recipients = {"مراسلة ولي الأمر": "guardian", "مراسلة الطالب": "student",
-                          "مراسلة المعلم": "teacher"}
-            if message in recipients:
-                question = send_question(case, recipients[message])
-                reply = "هذه صيغة مقترحة. يمكنك تعديلها قبل الإرسال."
-            elif message == "استكمال الحضور":
-                missing = next((item for item in result["summary"]["missing_attendance"]
-                                if item["student_id"] == sid), None)
-                question = ({"id": f"attendance:{sid}:{missing['date']}", "student_id": sid,
-                             "text": f"ما حالة حضور {case['alias']} في {missing['date']}؟",
-                             "options": ["سجّل حاضر", "سجّل غائب", "ما زال غير معروف"]}
-                            if missing else None)
-                reply = "اختر الحالة المؤكدة من السجل."
-            elif message == "تحديث المتابعة السابقة":
-                question = next(({"id": "followup:" + f["id"], "student_id": sid,
-                                  "text": f"هل تمت متابعة {case['alias']} المسجلة يوم {f['date']}؟",
-                                  "options": ["سجّل أنها تمّت واكتب النتيجة", "سجّل أنها لم تتم بعد", "لا أعرف"]}
-                                 for f in case["previous_followups"] if "pending" in f["outcome"].lower()), None)
-                reply = "أخبرني بنتيجة المتابعة."
-            elif message == "لا إجراء الآن":
-                question, reply = None, "حسنًا، لم أغيّر سجل الطالب."
-            else:
-                raise DataError("اختر خطوة من الخيارات المعروضة")
-        elif message == "إرسال الرسالة":
+        if message == "إرسال الرسالة":
             action = execute(data_file, "send_demo", CHAT_ACTOR, sid,
                              recipient_type=pending["recipient_type"],
                              subject=f"متابعة {case['alias']}", message=pending["draft"],
@@ -285,6 +311,20 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         with _sessions_lock:
             _sessions[known]["pending"] = question
         return {"answer": reply, "session_id": known, "question": question, "changed": changed}
+    if answer_to and answer_to.startswith("model:"):
+        pending = session.get("pending") if session else None
+        if not pending or pending.get("id") != answer_to:
+            raise DataError("هذا السؤال لم يعد نشطًا؛ اطلب مراجعة الحالة مرة أخرى")
+        if message.strip() not in pending["options"] and not save_answer:
+            raise DataError("اختر خطوة من الخيارات المعروضة")
+        choice_case_id = pending.get("student_id")
+        session["history"] = session.get("history", []) + [
+            {"question": pending["text"], "answer": message.strip()}]
+        session["pending"] = None
+        with _sessions_lock:
+            _sessions[known]["pending"] = None
+            _sessions[known]["history"] = session["history"]
+        answer_to = None
     if guided and not session:
         result = report(data_file, start, end)
         known = uuid.uuid4().hex
@@ -329,26 +369,46 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
                 reply = f"حدّثت متابعة {current_case['alias'] if current_case else pending['student_id']} إلى: {detail['after']}."
         else:
             reply = "دوّنت إجابتك في المراجعة. لم أعدّل سجل الطالب."
-        question = guided_question(result, answered) if guided else next_question(current_case) if current_case else None
+        question = guided_question(result, answered) if guided else None
+        response_id = session.get("response_id")
+        if not guided and current_case and os.environ.get("API_SERVER_KEY"):
+            note = ("\nThe preceding user answer was saved as the following outcome. "
+                    "This is the current, authoritative case state: "
+                    + case_evidence(current_case, data_file)
+                    + "\nDecide whether a DIFFERENT useful step or missing fact now needs attention. "
+                    "A completed guardian follow-up is not a reason to propose the same contact again. "
+                    "Respond briefly in Arabic. Add a [QUESTION] block only if a concrete next choice helps; "
+                    "otherwise say no further step is needed now. Do not execute another action.")
+            try:
+                advice, suggested, response_id = model_response(
+                    f"نتيجة المتابعة الجديدة: {message.strip()}", response_id, note)
+                reply += " " + advice
+                question = model_question(suggested, current_case, result)
+            except RuntimeError:
+                pass  # The saved action stands even if the conversational suggestion is unavailable.
         if not question:
-            reply += " انتهت الأسئلة الحالية؛ يمكنك طلب إجراء أو تقرير من المحادثة."
+            if guided:
+                reply += " انتهت الأسئلة الحالية؛ يمكنك طلب إجراء أو تقرير من المحادثة."
         with _sessions_lock:
-            _sessions[known].update(answered=answered, history=history, pending=question)
+            _sessions[known].update(answered=answered, history=history, pending=question,
+                                    response_id=response_id)
         return {"answer": reply, "session_id": known, "question": question, "changed": bool(action)}
 
     case_result = report(data_file, start, end) if all(context) else None
     case = mentioned_case(message, case_result, data_file) if case_result else None
-    if not case and session and session.get("pending") and case_result:
-        sid = session["pending"].get("student_id")
+    if not case and session and case_result:
+        sid = choice_case_id or (session.get("pending") or {}).get("student_id")
         case = case_by_id(case_result, data_file, sid)
     recipient = contact_target(message) if case else None
-    if case and recipient and any(term in message for term in ("ابعت", "ابعث", "أرسل", "ارسل", "رسالة", "تواصل")):
+    if case and recipient and any(term in message for term in ("ابعت", "ابعث", "أرسل", "ارسل", "رسالة", "مراسلة", "تواصل")):
         question = send_question(case, recipient)
         if not known:
             known = uuid.uuid4().hex
         with _sessions_lock:
             _sessions[known] = {"context": context, "response_id": session.get("response_id") if session else None,
-                                "answered": [], "history": [], "pending": question}
+                                "answered": session.get("answered", []) if session else [],
+                                "history": session.get("history", []) if session else [],
+                                "pending": question}
         return {"answer": "جهّزت الرسالة للمراجعة. اختر إرسالها أو تعديلها.",
                 "session_id": known, "question": question}
     status = hermes_status()
@@ -357,34 +417,19 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
     previous = session.get("response_id") if session else None
     pending = session.get("pending") if session else None
     context_note = ""
-    if guided:
+    if case_result:
         context_note = f"\nDataset: {data_file}; dates: {start} to {end}. "
+        if case:
+            context_note += "Current case state: " + case_evidence(case, data_file) + ". "
         if session and session.get("history"):
             context_note += "Review answers so far: " + json.dumps(session["history"][-8:], ensure_ascii=False) + ". "
         if pending:
             context_note += f"The open UI question is '{pending['text']}', but this message is a separate question or request, not an answer to it. "
-        context_note += "Respond to the user's latest request briefly; do not repeat the overall review."
-    body = {"model": "hermes-agent", "input": message.strip() + context_note,
-            "instructions": INSTRUCTIONS, "store": True}
-    if previous:
-        body["previous_response_id"] = previous
-    response = hermes_request("/v1/responses", body, timeout=120)
-    answer = "\n".join(
-        content.get("text", "")
-        for item in response.get("output", []) if item.get("type") == "message"
-        for content in item.get("content", []) if content.get("type") == "output_text"
-    ).strip()
-    answer, model_question = structured_question(answer)
-    if not answer:
-        raise RuntimeError("Hermes لم يُرجع ردًا نصيًا. حاول مرة ثانية.")
-    response_id = response.get("id")
-    if not isinstance(response_id, str) or not response_id:
-        raise RuntimeError("Hermes لم يُرجع معرف المحادثة. حاول مرة ثانية.")
-    reviewing_period = bool(case_result and any(term in message for term in
-                            ("راجع", "مراجعة", "الفترة", "الحالات")))
-    question = (next_question(case) if case else
-                guided_question(case_result, session.get("answered", []) if session else [])
-                if (guided or reviewing_period) and case_result else model_question)
+        context_note += ("Respond to the latest request briefly. Decide whether a relevant "
+                         "next question is useful; do not default to a contact menu or repeat "
+                         "a completed follow-up. Give no choices if there is nothing to decide.")
+    answer, suggested, response_id = model_response(message, previous, context_note)
+    question = model_question(suggested, case, case_result)
     with _sessions_lock:
         if not known:
             known = uuid.uuid4().hex

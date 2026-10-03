@@ -159,7 +159,7 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(len(storage.events("actions.jsonl")), 3)
             question = json.loads(self.fetch("/api/chat", {**context, "message": "ليش S-006؟",
                 "session_id": first["session_id"]})[2])
-            self.assertEqual(question["question"]["id"], "next:S-006")
+            self.assertIsNone(question["question"])
             self.assertIn("سجّل غائب", calls[-1][1]["input"])
             self.assertNotIn("Summarize relevant evidence", calls[-1][1]["input"])
             self.assertEqual(len(storage.events("dialogue.jsonl")), 3)
@@ -206,8 +206,11 @@ class WebAppTests(unittest.TestCase):
             if path == "/v1/toolsets":
                 return {"data": [{"name": "student_followup", "enabled": True,
                                   "tools": ["student_followup_info", "student_followup_analyze"]}]}
+            choice = ('[QUESTION]{"text":"هل نطلب سياق النتيجة من المعلم؟",'
+                      '"options":["مراسلة المعلم","لا إجراء الآن"]}[/QUESTION]'
+                      if "تالا" in body["input"] else "")
             return {"id": "resp-demo", "output": [{"type": "message", "content": [
-                {"type": "output_text", "text": "لدى تالا حالتان تحتاجان المتابعة."}]}]}
+                {"type": "output_text", "text": "راجعت الحالة. " + choice}]}]}
 
         context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
         with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
@@ -215,14 +218,66 @@ class WebAppTests(unittest.TestCase):
             first = json.loads(self.fetch("/api/chat", {**context, "message": "ما حالة تالا؟"})[2])
             period = json.loads(self.fetch("/api/chat", {**context, "message": "راجع الحالات في الفترة"})[2])
         self.assertEqual(self.fetch("/api/chat", {**context, "message": "ما حالة جنى؟"})[0], 400)
-        self.assertEqual(first["question"]["id"], "next:S-006")
-        self.assertEqual(period["question"]["id"], "followup:F-001")
+        self.assertTrue(first["question"]["id"].startswith("model:"))
+        self.assertIsNone(period["question"])
         self.assertIn("مراسلة المعلم", first["question"]["options"])
         self.assertEqual(storage.events("actions.jsonl"), [])
         second = json.loads(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
             "answer_to": first["question"]["id"], "message": "مراسلة المعلم"})[2])
         self.assertEqual(second["question"]["id"], "send:S-006:teacher")
         self.assertEqual(storage.events("actions.jsonl"), [])
+
+    def test_recorded_guardian_followup_asks_model_for_new_decision(self):
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
+        web._sessions["review-tim"] = {"context": (context["data_file"], context["start"], context["end"]),
+            "response_id": "prior", "answered": [], "history": [],
+            "pending": {"id": "followup:F-002", "student_id": "S-035",
+                        "text": "هل تمت متابعة تيم حازم؟", "options": ["سجّل أنها تمّت واكتب النتيجة"]}}
+        calls = []
+        def fake_hermes(path, body=None, timeout=3):
+            calls.append(body)
+            return {"id": "new-response", "output": [{"type": "message", "content": [
+                {"type": "output_text", "text": "بعد توثيق التواصل، اسأل المعلم عن وضعه الدراسي. "
+                  '[QUESTION]{"text":"هل تريد سؤال المعلم عن مستواه؟",'
+                  '"options":["مراسلة المعلم","لا إجراء الآن"]}[/QUESTION]'}]}]}
+        with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
+             patch.object(web, "hermes_request", side_effect=fake_hermes):
+            saved = json.loads(self.fetch("/api/chat", {**context, "session_id": "review-tim",
+                "answer_to": "followup:F-002", "message": "تم متابعة الحالة مع والده",
+                "save_answer": True})[2])
+            self.assertEqual(saved["question"]["options"], ["مراسلة المعلم", "لا إجراء الآن"])
+            self.assertNotIn("مراسلة ولي الأمر", saved["question"]["options"])
+            self.assertIn("تمّت المتابعة: تم متابعة الحالة مع والده", calls[0]["input"])
+            self.assertEqual(calls[0]["previous_response_id"], "prior")
+            chosen = json.loads(self.fetch("/api/chat", {**context, "session_id": "review-tim",
+                "answer_to": saved["question"]["id"], "message": "مراسلة المعلم"})[2])
+        self.assertEqual(chosen["question"]["id"], "send:S-035:teacher")
+        self.assertEqual(storage.read_data(context["data_file"])["followups"][1]["outcome"],
+                         "تمّت المتابعة: تم متابعة الحالة مع والده")
+        self.assertEqual(len(storage.events("actions.jsonl")), 1)
+
+    def test_model_can_select_pending_followup_or_no_next_step(self):
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
+        def fake_hermes(path, body=None, timeout=3):
+            if path == "/v1/toolsets":
+                return {"data": [{"name": "student_followup", "enabled": True,
+                                  "tools": ["student_followup_info", "student_followup_analyze"]}]}
+            if "راجع" in body["input"]:
+                answer = ('في متابعة معلقة لتيم. [QUESTION]{"text":"هل تمت متابعة تيم حازم؟",'
+                    '"options":["سجّل أنها تمّت واكتب النتيجة","سجّل أنها لم تتم بعد","لا أعرف"],'
+                    '"action":{"type":"resolve_followup","student_id":"S-035",'
+                    '"followup_id":"F-002"}}[/QUESTION]')
+            else:
+                answer = "النتيجة محفوظة، ولا توجد خطوة أخرى مطلوبة الآن."
+            return {"id": "resp", "output": [{"type": "message", "content": [{"type": "output_text", "text": answer}]}]}
+        with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
+             patch.object(web, "hermes_request", side_effect=fake_hermes):
+            first = json.loads(self.fetch("/api/chat", {**context, "message": "راجع الحالات"})[2])
+            self.assertEqual(first["question"]["id"], "followup:F-002")
+            saved = json.loads(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
+                "answer_to": "followup:F-002", "message": "تمت مع والده", "save_answer": True})[2])
+        self.assertIsNone(saved["question"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 1)
 
     def test_report_feedback_and_local_action_http_flow(self):
         context = {"data_file": "data/fictional_school.json", "start": "2026-09-10", "end": "2026-09-10"}
