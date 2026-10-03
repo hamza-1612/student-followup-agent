@@ -93,11 +93,15 @@ python -m web_app
 
 Use `py -m web_app` if Python is exposed as `py`. Open
 `http://127.0.0.1:8000` in your browser. This command starts a local Hermes
-gateway with a temporary API key when it finds Hermes, and stops that child
+gateway via `hermes gateway run` with a temporary API key when it finds Hermes,
+and stops that child
 process when you press Ctrl+C. The key stays in the local processes and never
 goes to the browser. The interface and Hermes API bind to `127.0.0.1` only.
 If Hermes is unavailable or its project plugin is not enabled, the dashboard
 and review form still work, while the chat panel explains the connection issue.
+If the chat remains offline, read the status pill and the PowerShell output;
+an early gateway exit code or an occupied port is reported explicitly. Wait
+for gateway startup before trying the chat.
 To intentionally use only the dashboard, run `python -m web_app --no-hermes`.
 If another Hermes API gateway is already using port 8642, close it before
 starting the one-command interface, or provide its matching `API_SERVER_KEY`

@@ -32,6 +32,8 @@ INSTRUCTIONS = (ROOT / "AGENTS.md").read_text(encoding="utf-8") + (
 )
 _sessions = {}
 _sessions_lock = threading.Lock()
+gateway_process = None
+gateway_problem = None
 
 
 def dataset_catalog():
@@ -105,15 +107,24 @@ def hermes_request(path, body=None, timeout=3):
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise RuntimeError("خادم Hermes ردّ برفض المفتاح؛ قد يكون على المنفذ 8642 خادم آخر بمفتاح مختلف.") from exc
+        raise RuntimeError(f"خادم Hermes ردّ بخطأ HTTP {exc.code} على {path}.") from exc
     except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-        raise RuntimeError("تعذّر الاتصال بخادم Hermes المحلي. تأكد أنه يعمل وأن الإضافة مفعّلة.") from exc
+        raise RuntimeError("تعذّر الاتصال بخادم Hermes المحلي على 127.0.0.1:8642؛ راجع مخرجات PowerShell.") from exc
 
 
 def hermes_status():
+    if gateway_process is not None and gateway_process.poll() is not None:
+        return {"ready": False, "message": f"توقف Hermes gateway run برمز {gateway_process.returncode}؛ راجع مخرجات PowerShell."}
+    if gateway_problem:
+        return {"ready": False, "message": gateway_problem}
     if not os.environ.get("API_SERVER_KEY"):
         return {"ready": False, "message": "Hermes غير متصل؛ التحليل والمراجعة متاحان."}
     try:
-        toolsets = hermes_request("/v1/toolsets", timeout=2)
+        payload = hermes_request("/v1/toolsets", timeout=2)
+        toolsets = payload.get("data", []) if isinstance(payload, dict) else payload
         ready = isinstance(toolsets, list) and any(
             item.get("name") == "student_followup" and item.get("enabled", True)
             and {"student_followup_info", "student_followup_analyze"} <= set(item.get("tools", []))
@@ -121,8 +132,8 @@ def hermes_status():
         )
         return {"ready": ready, "message": "Hermes جاهز للمحادثة" if ready else
                 "Hermes متصل، لكن أدوات متابعة الطلاب غير مفعّلة. فعّل student-followup وأعد التشغيل."}
-    except RuntimeError:
-        return {"ready": False, "message": "Hermes غير متصل؛ التحليل والمراجعة متاحان."}
+    except RuntimeError as exc:
+        return {"ready": False, "message": str(exc)}
 
 
 def chat(message, session_id=None, guided=False, data_file=None, start=None, end=None, answer_to=None):

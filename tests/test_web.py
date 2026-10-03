@@ -97,8 +97,9 @@ class WebAppTests(unittest.TestCase):
         def fake_hermes(path, body=None, timeout=3):
             calls.append((path, body))
             if path == "/v1/toolsets":
-                return [{"name": "student_followup", "enabled": True,
-                         "tools": ["student_followup_info", "student_followup_analyze"]}]
+                return {"object": "list", "platform": "api_server", "data": [
+                    {"name": "student_followup", "enabled": True,
+                     "tools": ["student_followup_info", "student_followup_analyze"]}]}
             return {"id": f"resp-{len(calls)}", "output": [
                 {"type": "message", "content": [{"type": "output_text", "text": "30 طالبًا"}]}]}
 
@@ -121,7 +122,9 @@ class WebAppTests(unittest.TestCase):
         def fake_hermes(path, body=None, timeout=3):
             calls.append(path)
             if path == "/v1/toolsets":
-                return [{"name": "student_followup", "tools": ["student_followup_info", "student_followup_analyze"]}]
+                return {"object": "list", "platform": "api_server", "data": [
+                    {"name": "student_followup", "enabled": True,
+                     "tools": ["student_followup_info", "student_followup_analyze"]}]}
             return {"id": f"resp-{len(calls)}", "output": [
                 {"type": "message", "content": [{"type": "output_text", "text": "وجدت ثلاث حالات للمراجعة."}]}]}
 
@@ -170,7 +173,7 @@ class WebAppTests(unittest.TestCase):
         child = Child()
 
         def spawn(command, cwd, env):
-            self.assertEqual(command, ["hermes.exe", "gateway"])
+            self.assertEqual(command, ["hermes.exe", "gateway", "run"])
             self.assertEqual(cwd, web.ROOT)
             child.environment = env
             return child
@@ -185,6 +188,21 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(child.environment["HERMES_ENABLE_PROJECT_PLUGINS"], "true")
             self.assertEqual(child.environment["API_SERVER_ENABLED"], "true")
             self.assertEqual(os.environ["API_SERVER_KEY"], child.environment["API_SERVER_KEY"])
+
+    def test_gateway_exit_and_occupied_port_have_specific_status(self):
+        class Stopped:
+            returncode = 2
+
+            def poll(self):
+                return 2
+
+        with patch.object(web, "gateway_process", Stopped()), patch.object(web, "gateway_problem", None):
+            status = web.hermes_status()
+            self.assertFalse(status["ready"])
+            self.assertIn("gateway run برمز 2", status["message"])
+        with patch.object(web, "gateway_process", None), \
+             patch.object(web, "gateway_problem", "المنفذ 8642 مستخدم بالفعل"):
+            self.assertIn("8642", web.hermes_status()["message"])
 
 
 if __name__ == "__main__":

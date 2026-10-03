@@ -8,6 +8,7 @@ import socket
 import subprocess
 from pathlib import Path
 
+from . import server
 from .server import ROOT, serve
 
 
@@ -48,11 +49,16 @@ def main(argv=None):
             environment["API_SERVER_PORT"] = "8642"
             environment["API_SERVER_KEY"] = secrets.token_urlsafe(32)
             os.environ["API_SERVER_KEY"] = environment["API_SERVER_KEY"]
-            child = subprocess.Popen([executable, "gateway"], cwd=ROOT, env=environment)
+            # `gateway` alone is a command group; `run` starts the foreground server.
+            child = subprocess.Popen([executable, "gateway", "run"], cwd=ROOT, env=environment)
+            server.gateway_process = child
             print("جارٍ تشغيل Hermes المحلي. إذا لم تتصل المحادثة، تحقق من تفعيل student-followup.", flush=True)
         elif executable and os.environ.get("API_SERVER_KEY"):
             print("سيُستخدم خادم Hermes الموجود على المنفذ 8642.", flush=True)
         else:
+            server.gateway_problem = ("المنفذ 8642 مستخدم بالفعل؛ أغلق خادم Hermes الآخر أو زوّد API_SERVER_KEY الخاص به."
+                                      if executable and port_open(8642) else
+                                      "تعذّر العثور على Hermes؛ تحقق من تثبيته في LOCALAPPDATA أو من HERMES_EXE.")
             print("Hermes غير متاح للمحادثة. لوحة التحليل وقرارات المراجع ستعمل محليًا.", flush=True)
     try:
         serve(args.port)
