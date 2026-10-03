@@ -11,7 +11,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from student_followup import DataError, analyze
+from student_followup import DataError, analyze, storage
 from student_followup.actions import execute
 from student_followup.context import case_context
 from student_followup.learning import policy, record_feedback
@@ -71,6 +71,16 @@ def report(name, start, end):
     raw = read_bytes(name)
     result = analyze(json.loads(raw), start, end, policy())
     return attach_reviews(result, load_latest(REVIEWS, dataset_hash(raw), start, end))
+
+
+def page_revision(data_file):
+    """A cheap marker for student records and the local decision logs."""
+    paths = (storage.active_path(data_file), storage.OUTPUT / "actions.jsonl",
+             REVIEWS, storage.OUTPUT / "feedback.jsonl")
+    return "|".join(
+        f"{path.stat().st_mtime_ns:x}:{path.stat().st_size:x}" if path.exists() else "0:0"
+        for path in paths
+    )
 
 
 def guided_question(result, answered):
@@ -528,6 +538,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(content)))
+        self.send_header("Cache-Control", "no-store"
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'")
         self.end_headers()
@@ -551,6 +562,8 @@ class Handler(BaseHTTPRequestHandler):
                                                        "name": row["alias"]} for row in students]})
             if route.path == "/api/status":
                 return self._json(200, hermes_status())
+            if route.path == "/api/revision":
+                return self._json(200, {"revision": page_revision(query.get("data_file", [""])[0])})
             if route.path == "/api/context":
                 return self._json(200, {"events": case_context(query.get("data_file", [""])[0],
                     query.get("student_id", [None])[0])})
@@ -560,7 +573,10 @@ class Handler(BaseHTTPRequestHandler):
                     if not value:
                         raise DataError("حدد الملف وتاريخ البداية والنهاية")
                     return value
-                return self._json(200, report(required("data_file"), required("start"), required("end")))
+                name = required("data_file")
+                result = report(name, required("start"), required("end"))
+                result["revision"] = page_revision(name)
+                return self._json(200, result)
             self._json(404, {"error": "العنوان غير موجود"})
         except (DataError, ValueError, OSError, TypeError) as exc:
             self._json(400, {"error": str(exc)})
@@ -584,9 +600,14 @@ class Handler(BaseHTTPRequestHandler):
                                     body.get("note"), REVIEWS, policy())
                 return self._json(200, {"review": row})
             if self.path == "/api/chat":
-                return self._json(200, chat(body.get("message"), body.get("session_id"),
-                    body.get("guided", False), body.get("data_file"), body.get("start"),
-                    body.get("end"), body.get("answer_to"), body.get("save_answer", False)))
+                name = body.get("data_file")
+                before = page_revision(name) if name else None
+                result = chat(body.get("message"), body.get("session_id"),
+                    body.get("guided", False), name, body.get("start"),
+                    body.get("end"), body.get("answer_to"), body.get("save_answer", False))
+                after = page_revision(name) if name else None
+                result["changed"] = bool(result.get("changed")) or before != after
+                return self._json(200, result)
             if self.path == "/api/report":
                 item = create_report(read_data(body.get("data_file")), body.get("start"),
                                      body.get("end"), body.get("purpose"), policy())

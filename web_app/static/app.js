@@ -1,7 +1,8 @@
 const $ = (selector) => document.querySelector(selector);
 const state = { dataset: null, report: null, selected: null, sessionId: null, chatBusy: false,
   guided: false, question: null, freeformAnswerTo: null, freeformSave: false,
-  actionBusy: false, actionKey: null, actionRequestId: null };
+  actionBusy: false, actionKey: null, actionRequestId: null,
+  dataRevision: null, analysisBusy: false, revisionBusy: false, loadedDataset: null, loadedPeriod: null, detailVersion: 0 };
 
 async function request(url, options = {}) {
   const response = await fetch(url, options);
@@ -22,6 +23,16 @@ function setStatus(message, ready) {
   const status = $("#connection-status");
   status.classList.toggle("ready", !!ready);
   status.querySelector("span:last-child").textContent = message;
+}
+
+async function refreshDataRevision() {
+  if (!state.dataset || state.dataRevision === null || state.chatBusy || state.actionBusy || state.analysisBusy || state.revisionBusy) return;
+  state.revisionBusy = true;
+  try {
+    const data = await request(`/api/revision?${new URLSearchParams({ data_file: state.dataset })}`);
+    if (data.revision !== state.dataRevision) await loadAnalysis(true);
+  } catch { /* A temporary connection issue must not replace the displayed report. */ }
+  finally { state.revisionBusy = false; }
 }
 
 async function refreshStatus() {
@@ -73,24 +84,36 @@ function applyDatasetDates(item) {
   }
 }
 
-async function loadAnalysis() {
+async function loadAnalysis(preserveCase = false) {
   const button = $("#analyze-btn");
+  const previousCase = [...(state.report?.candidates || []), ...(state.report?.unresolved || [])]
+    .find(item => item.student_id === state.selected);
+  const currentPeriod = `${$("#period-start").value}:${$("#period-end").value}`;
+  const sameContext = state.loadedDataset === state.dataset && state.loadedPeriod === currentPeriod;
+  state.analysisBusy = true;
   button.disabled = true;
   button.textContent = "جارٍ الفحص…";
   try {
     const params = new URLSearchParams({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value });
     state.report = await request(`/api/analysis?${params}`);
-    renderReport();
+    state.dataRevision = state.report.revision;
+    state.loadedDataset = state.dataset;
+    state.loadedPeriod = currentPeriod;
+    const cases = [...state.report.candidates, ...state.report.unresolved];
+    const resolvedName = preserveCase && sameContext && previousCase &&
+      !cases.some(item => item.student_id === previousCase.student_id) ? previousCase.alias : null;
+    renderReport(resolvedName);
   } catch (error) {
     $("#cases-list").replaceChildren(node("p", "empty", error.message));
     $("#attendance-chart").replaceChildren(node("p", "empty", "تعذّر عرض الحضور للفترة المختارة."));
   } finally {
+    state.analysisBusy = false;
     button.disabled = false;
     button.innerHTML = 'تحديث التحليل <span aria-hidden="true">↗</span>';
   }
 }
 
-function renderReport() {
+function renderReport(resolvedName = null) {
   const summary = state.report.summary;
   $("#stat-students").textContent = summary.students;
   $("#stat-candidates").textContent = summary.candidates;
@@ -140,7 +163,13 @@ function renderReport() {
     row.addEventListener("click", () => { selectCase(item.student_id); sendChat(`ما حالة ${item.alias} وما الخطوة المناسبة؟`); });
     list.append(row);
   }
-  selectCase(cases.some(item => item.student_id === state.selected) ? state.selected : cases[0]?.student_id);
+  if (resolvedName) {
+    selectCase(null);
+    $("#detail-title").textContent = resolvedName;
+    $("#detail-priority").textContent = "تم تحديث الحالة";
+    $("#detail-priority").className = "priority-tag neutral";
+    $("#detail-body").replaceChildren(block("نتيجة التحديث", "لم تعد هذه الحالة ضمن قائمة المتابعة في الفترة المختارة. تم تحديث الأرقام وسجل الحضور."));
+  } else selectCase(cases.some(item => item.student_id === state.selected) ? state.selected : cases[0]?.student_id);
 }
 
 function priorityClass(item) { return item.priority === "high" ? "high" : item.priority === "standard" ? "standard" : "neutral"; }
@@ -165,6 +194,7 @@ function block(title, lines) {
 }
 
 function selectCase(studentId) {
+  const detailVersion = ++state.detailVersion;
   state.selected = studentId || null;
   for (const row of document.querySelectorAll(".case-row")) row.classList.toggle("selected", row.dataset.student === studentId);
   const item = [...state.report.candidates, ...state.report.unresolved].find(entry => entry.student_id === studentId);
@@ -205,7 +235,7 @@ function selectCase(studentId) {
   $("#review-note").value = "";
   const params = new URLSearchParams({ data_file: state.dataset, student_id: item.student_id });
   request(`/api/context?${params}`).then(data => {
-    if (state.selected !== item.student_id || !data.events.length) return;
+    if (detailVersion !== state.detailVersion || state.selected !== item.student_id || !data.events.length) return;
     details.append(block("سجل الطالب", data.events.slice(0, 8).map(entry => {
       if (entry.action === "send_demo") return `${entry.at.slice(0, 10)} · رسالة إلى ${({guardian:"ولي الأمر",student:"الطالب",teacher:"المعلم"})[entry.details.recipient_type]} مسجّلة في سجل التواصل: ${entry.details.message}`;
       if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${({confirmed:"مؤشر صحيح",false_alert:"إنذار غير صحيح",missed_case:"حالة فائتة"})[entry.label] || entry.label} · ${entry.note}`;
@@ -224,7 +254,7 @@ async function saveReview(event) {
   feedback.classList.remove("error");
   try {
     await request("/api/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, student_id: state.selected, decision: $("#decision-select").value, note: $("#review-note").value }) });
-    await loadAnalysis();
+    await loadAnalysis(true);
     feedback.textContent = "تم حفظ قرار المراجع محليًا. لم يُرسل أي تواصل.";
   } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
 }
@@ -275,7 +305,7 @@ async function sendChat(message, answerTo = state.freeformAnswerTo, saveAnswer =
     waiting.querySelector("p").textContent = data.answer;
     state.question = data.question;
     renderQuestion(waiting, data.question);
-    if (data.changed) await loadAnalysis();
+    if (data.changed) await loadAnalysis(true);
   } catch (error) { state.question = oldQuestion; state.freeformAnswerTo = answerTo; state.freeformSave = saveAnswer; waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
   finally { state.chatBusy = false; $("#chat-form button").disabled = false; }
 }
@@ -288,7 +318,7 @@ async function saveFeedback(event) {
     const data = await request("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, student_id: $("#feedback-student").value.trim(), label: $("#feedback-label").value, note: $("#feedback-note").value }) });
     result.textContent = data.policy_changed ? "حُفظ التقييم وتحدّث أسلوب اختيار الحالات." : "حُفظ التقييم.";
     $("#feedback-note").value = "";
-    if (data.policy_changed) await loadAnalysis();
+    await loadAnalysis(true);
   } catch (error) { result.textContent = error.message; result.classList.add("error"); }
 }
 
@@ -337,13 +367,12 @@ async function runAction(event) {
     feedback.textContent = data.action.state === "sent_demo" ? "تم إرسال الرسالة إلى سجل التواصل مع الطالب." : data.action.state === "sent" ? "تم إرسال الرسالة وتسجيلها." : data.action.state === "queued_local" ? "حُفظ طلب التواصل." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال." : "تم حفظ التعديل في سجل الطالب.";
     state.actionKey = null;
     state.actionRequestId = null;
-    if (["record_attendance", "resolve_followup", "add_school_day"].includes(action)) await loadAnalysis();
-    else if (action === "send_demo") selectCase(state.selected);
+    await loadAnalysis(true);
   } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
   finally { state.actionBusy = false; button.disabled = false; }
 }
 
-$("#analyze-btn").addEventListener("click", loadAnalysis);
+$("#analyze-btn").addEventListener("click", () => loadAnalysis());
 $("#review-form").addEventListener("submit", saveReview);
 $("#feedback-form").addEventListener("submit", saveFeedback);
 $("#report-form").addEventListener("submit", createReport);
@@ -356,4 +385,5 @@ $("#clear-chat").addEventListener("click", () => { state.sessionId = null; state
 for (const button of document.querySelectorAll("[data-prompt]")) button.addEventListener("click", () => sendChat(button.dataset.prompt));
 refreshStatus();
 setInterval(refreshStatus, 8000);
+setInterval(refreshDataRevision, 8000);
 loadDatasets().catch(error => { $("#cases-list").replaceChildren(node("p", "empty", error.message)); });

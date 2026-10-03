@@ -120,6 +120,34 @@ class WebAppTests(unittest.TestCase):
         with patch.dict(os.environ, {"API_SERVER_KEY": ""}):
             self.assertEqual(self.fetch("/api/chat", {"message": "كم طالب؟"})[0], 503)
 
+    def test_model_action_marks_chat_changed_and_revision(self):
+        context = {"data_file": "data/fictional_school.json",
+                   "start": "2026-09-07", "end": "2026-09-11"}
+        url = "/api/revision?data_file=data%2Ffictional_school.json"
+        before = json.loads(self.fetch(url)[2])["revision"]
+
+        def fake_hermes(path, body=None, timeout=3):
+            if path == "/v1/toolsets":
+                return {"data": [{"name": "student_followup", "enabled": True,
+                                  "tools": ["student_followup_info", "student_followup_analyze"]}]}
+            web.execute(context["data_file"], "record_attendance", "Teacher", "S-033",
+                        day="2026-09-09", status="present", request_id="model-write-test")
+            return {"id": "resp-action", "output": [{"type": "message", "content": [
+                {"type": "output_text", "text": "تم تحديث حضور أحمد سائد."}]}]}
+
+        with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
+             patch.object(web, "hermes_request", side_effect=fake_hermes):
+            status, _, payload = self.fetch("/api/chat", {**context,
+                "message": "سجّل حضور أحمد سائد يوم 9 سبتمبر"})
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(payload)["changed"])
+        after = json.loads(self.fetch(url)[2])["revision"]
+        self.assertNotEqual(before, after)
+        query = urllib.parse.urlencode(context)
+        summary = json.loads(self.fetch("/api/analysis?" + query)[2])["summary"]
+        self.assertFalse(any(row["student_id"] == "S-033" and row["date"] == "2026-09-09"
+                             for row in summary["missing_attendance"]))
+
     def test_agent_prompts_with_clickable_question_and_advances_on_answer(self):
         calls = []
 
