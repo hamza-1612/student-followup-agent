@@ -259,12 +259,17 @@ async function saveReview(event) {
   } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
 }
 
+function scrollChatToBottom() {
+  const messages = $("#chat-messages");
+  messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" });
+}
+
 function addMessage(text, type) {
   const box = node("div", `message ${type}`);
   if (type !== "user") box.append(node("span", "message-label", type === "error" ? "تعذّر الرد" : "مساعد المراجعة"));
   box.append(node("p", "", text));
   $("#chat-messages").append(box);
-  box.scrollIntoView({ block: "end", behavior: "smooth" });
+  scrollChatToBottom();
   return box;
 }
 
@@ -305,6 +310,7 @@ async function sendChat(message, answerTo = state.freeformAnswerTo, saveAnswer =
     waiting.querySelector("p").textContent = data.answer;
     state.question = data.question;
     renderQuestion(waiting, data.question);
+    scrollChatToBottom();
     if (data.changed) await loadAnalysis(true);
   } catch (error) { state.question = oldQuestion; state.freeformAnswerTo = answerTo; state.freeformSave = saveAnswer; waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
   finally { state.chatBusy = false; $("#chat-form button").disabled = false; }
