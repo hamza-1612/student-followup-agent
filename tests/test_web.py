@@ -190,7 +190,8 @@ class WebAppTests(unittest.TestCase):
         sent = json.loads(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
             "answer_to": changed["question"]["id"], "message": "إرسال الرسالة"})[2])
         self.assertTrue(sent["changed"])
-        self.assertIn("تم الإرسال تجريبيًا", sent["answer"])
+        self.assertIn("تم إرسال الرسالة إلى سجل التواصل", sent["answer"])
+        self.assertNotIn("تجريبيًا", sent["answer"])
         action = storage.events("actions.jsonl")[0]
         self.assertEqual(action["state"], "sent_demo")
         self.assertEqual(action["details"]["message"], "نرجو زيارة المدرسة غدًا.")

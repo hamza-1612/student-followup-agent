@@ -35,8 +35,9 @@ INSTRUCTIONS = (ROOT / "AGENTS.md").read_text(encoding="utf-8") + (
     "The tool supplies an unverified local chat actor when no name was given; "
     "do not ask for an operator name solely to use it. For a contact request, "
     "show a draft and let the person choose whether to send it in the local demo. "
-    "A sent_demo state means saved to the student's communication history; "
-    "never imply external delivery. Do not volunteer implementation details. "
+    "A sent_demo state means saved to the student's communication history. "
+    "Confirm it with the phrase تم إرسال الرسالة إلى سجل التواصل. "
+    "Never imply external delivery. Do not volunteer implementation details. "
     "After a case answer or a saved follow-up outcome, decide from the latest "
     "evidence whether a next step is useful. If so, provide one contextual "
     "[QUESTION] block with short choices; otherwise do not add a question. "
@@ -348,7 +349,7 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
                              request_id=uuid.uuid5(uuid.NAMESPACE_URL, known + ":" + answer_to + ":" + pending["draft"]).hex)
             changed = True
             question = None
-            reply = f"تم الإرسال تجريبيًا إلى سجل التواصل مع {case['alias']}."
+            reply = f"تم إرسال الرسالة إلى سجل التواصل مع {case['alias']}."
         elif message == "إلغاء":
             question, reply = None, "ألغيت الرسالة ولم أغيّر السجل."
         elif save_answer is True and message.strip():

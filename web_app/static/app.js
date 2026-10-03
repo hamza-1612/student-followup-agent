@@ -207,7 +207,7 @@ function selectCase(studentId) {
   request(`/api/context?${params}`).then(data => {
     if (state.selected !== item.student_id || !data.events.length) return;
     details.append(block("سجل الطالب", data.events.slice(0, 8).map(entry => {
-      if (entry.action === "send_demo") return `${entry.at.slice(0, 10)} · تم الإرسال تجريبيًا إلى ${({guardian:"ولي الأمر",student:"الطالب",teacher:"المعلم"})[entry.details.recipient_type]}: ${entry.details.message}`;
+      if (entry.action === "send_demo") return `${entry.at.slice(0, 10)} · رسالة إلى ${({guardian:"ولي الأمر",student:"الطالب",teacher:"المعلم"})[entry.details.recipient_type]} مسجّلة في سجل التواصل: ${entry.details.message}`;
       if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${({confirmed:"مؤشر صحيح",false_alert:"إنذار غير صحيح",missed_case:"حالة فائتة"})[entry.label] || entry.label} · ${entry.note}`;
       if (entry.type === "review") return `${entry.at.slice(0, 10)} · قرار مراجعة: ${decisionName(entry.decision)} · ${entry.note}`;
       if (entry.type === "answer") return `${entry.at.slice(0, 10)} · إجابة: ${entry.answer}`;
@@ -334,7 +334,7 @@ async function runAction(event) {
     state.actionBusy = true;
     button.disabled = true;
     const data = await request("/api/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    feedback.textContent = data.action.state === "sent_demo" ? "تم الإرسال تجريبيًا وحُفظت الرسالة في سجل الطالب." : data.action.state === "sent" ? "تم إرسال الرسالة وتسجيلها." : data.action.state === "queued_local" ? "حُفظ طلب التواصل." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال." : "تم حفظ التعديل في سجل الطالب.";
+    feedback.textContent = data.action.state === "sent_demo" ? "تم إرسال الرسالة إلى سجل التواصل مع الطالب." : data.action.state === "sent" ? "تم إرسال الرسالة وتسجيلها." : data.action.state === "queued_local" ? "حُفظ طلب التواصل." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال." : "تم حفظ التعديل في سجل الطالب.";
     state.actionKey = null;
     state.actionRequestId = null;
     if (["record_attendance", "resolve_followup", "add_school_day"].includes(action)) await loadAnalysis();

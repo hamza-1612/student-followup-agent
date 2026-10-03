@@ -59,8 +59,9 @@ if the student, date, or recipient is genuinely missing.
 Attendance, follow-up, and school-day changes live only in a local overlay
 under ignored `outputs/datasets/`. In the fictional demo, `send_demo` records
 the exact reviewed message and recipient in the student's local communication
-history. Only after the tool returns `sent_demo` say "تم الإرسال تجريبيًا".
-Never imply external delivery. `queue_contact` only saves a pending request.
+history. Only after the tool returns `sent_demo` say the message was sent to
+the student's communication history. Never imply
+external delivery. `queue_contact` only saves a pending request.
 `send_email` remains available when a real recipient and SMTP are configured;
 only `sent` confirms the mail server accepted the message.
 An operator name in this localhost demo is not a verified school login.
