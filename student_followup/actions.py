@@ -15,7 +15,7 @@ from .storage import _lock, append_event, events, read_data, save_data
 def execute(data_file, action, actor, student_id=None, day=None, status=None,
             followup_id=None, outcome=None, recipient_type=None, subject=None,
             message=None, request_id=None):
-    if action not in ("record_attendance", "resolve_followup", "queue_contact", "send_email", "add_school_day"):
+    if action not in ("record_attendance", "resolve_followup", "queue_contact", "send_email", "send_demo", "add_school_day"):
         raise DataError("unsupported action")
     if not isinstance(actor, str) or not actor.strip() or len(actor) > 100:
         raise DataError("enter the local operator name")
@@ -74,8 +74,8 @@ def execute(data_file, action, actor, student_id=None, day=None, status=None,
             details = {"student_id": student_id, "followup_id": followup_id,
                        "before": before, "after": outcome.strip()}
         else:
-            if recipient_type not in ("guardian", "student"):
-                raise DataError("recipient_type must be guardian or student")
+            if recipient_type not in (("guardian", "student", "teacher") if action == "send_demo" else ("guardian", "student")):
+                raise DataError("recipient_type must be guardian, student, or teacher")
             if not isinstance(message, str) or not message.strip() or len(message) > 2000:
                 raise DataError("message must be 1 to 2000 characters")
             if not isinstance(subject, str) or not subject.strip() or len(subject) > 160:
@@ -111,10 +111,15 @@ def execute(data_file, action, actor, student_id=None, day=None, status=None,
                                  "action": action, "data_file": data_file, "state": "failed_or_unknown",
                                  "details": details})
                     raise DataError("Email delivery was not confirmed; check the provider before retrying") from exc
+            elif action == "send_demo":
+                details = {"student_id": student_id, "recipient_type": recipient_type,
+                           "recipient": students[student_id].get(recipient_type + "_name"),
+                           "subject": subject.strip(), "message": message.strip()}
             else:
                 details = {"student_id": student_id, "recipient_type": recipient_type,
                            "recipient": email, "subject": subject.strip(), "message": message.strip()}
-        state = "sent" if action == "send_email" else "queued_local" if action == "queue_contact" else "completed"
+        state = ("sent" if action == "send_email" else "sent_demo" if action == "send_demo"
+                 else "queued_local" if action == "queue_contact" else "completed")
         return append_event("actions.jsonl", {"request_id": request_id, "fingerprint": fingerprint,
                             "actor": actor.strip(),
                             "action": action, "data_file": data_file, "state": state, "details": details})

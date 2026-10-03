@@ -124,7 +124,7 @@ function renderReport() {
     copy.append(node("strong", "", `${item.alias} · ${item.student_id}`));
     copy.append(node("span", "", item.alerts.length ? item.alerts.map(alertName).join(" · ") : "سجل حضور يحتاج تحققًا"));
     row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)), node("span", "case-arrow", "‹"));
-    row.addEventListener("click", () => selectCase(item.student_id));
+    row.addEventListener("click", () => { selectCase(item.student_id); sendChat(`ما حالة ${item.alias} (${item.student_id}) وما الخطوة المناسبة؟`); });
     list.append(row);
   }
   selectCase(cases.some(item => item.student_id === state.selected) ? state.selected : cases[0]?.student_id);
@@ -181,7 +181,8 @@ function selectCase(studentId) {
   const params = new URLSearchParams({ data_file: state.dataset, student_id: item.student_id });
   request(`/api/context?${params}`).then(data => {
     if (state.selected !== item.student_id || !data.events.length) return;
-    details.append(block("سياق محفوظ من الجولات السابقة", data.events.slice(0, 5).map(entry => {
+    details.append(block("سجل الطالب", data.events.slice(0, 8).map(entry => {
+      if (entry.action === "send_demo") return `${entry.at.slice(0, 10)} · تم الإرسال تجريبيًا إلى ${({guardian:"ولي الأمر",student:"الطالب",teacher:"المعلم"})[entry.details.recipient_type]}: ${entry.details.message}`;
       if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${entry.label} · ${entry.note}`;
       if (entry.type === "review") return `${entry.at.slice(0, 10)} · قرار مراجعة: ${decisionName(entry.decision)} · ${entry.note}`;
       if (entry.type === "answer") return `${entry.at.slice(0, 10)} · إجابة: ${entry.answer}`;
@@ -220,10 +221,10 @@ function renderQuestion(box, question) {
     const button = node("button", "question-option", option);
     button.type = "button";
     button.addEventListener("click", () => {
-      if (option === "تفصيل آخر" || option.includes("اكتب النتيجة")) {
+      if (option === "تفصيل آخر" || option.includes("اكتب النتيجة") || option === "تعديل الرسالة") {
         state.freeformAnswerTo = question.id;
-        state.freeformSave = option.includes("اكتب النتيجة");
-        $("#chat-input").placeholder = state.freeformSave ? "اكتب نتيجة المتابعة لتحفظها…" : "اكتب التفاصيل التي تعرفها عن السؤال…";
+        state.freeformSave = option.includes("اكتب النتيجة") || option === "تعديل الرسالة";
+        $("#chat-input").placeholder = option === "تعديل الرسالة" ? "اكتب نص الرسالة المعدّل…" : state.freeformSave ? "اكتب نتيجة المتابعة لتحفظها…" : "اكتب التفاصيل التي تعرفها عن السؤال…";
         $("#chat-input").focus();
       } else sendChat(option, question.id);
     });
@@ -260,7 +261,7 @@ async function saveFeedback(event) {
   result.classList.remove("error");
   try {
     const data = await request("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, student_id: $("#feedback-student").value.trim(), label: $("#feedback-label").value, note: $("#feedback-note").value }) });
-    result.textContent = data.policy_changed ? `حُفظ التقييم وتحدّثت قواعد الفرز تلقائيًا إلى النسخة ${data.policy.version}.` : "حُفظ التقييم. سيُراجع الوكيل القواعد تلقائيًا عندما تتوفر أمثلة كافية.";
+    result.textContent = data.policy_changed ? "حُفظ التقييم وتحدّث أسلوب اختيار الحالات." : "حُفظ التقييم.";
     $("#feedback-note").value = "";
     if (data.policy_changed) await loadAnalysis();
   } catch (error) { result.textContent = error.message; result.classList.add("error"); }
@@ -284,7 +285,7 @@ function showActionFields() {
   const kind = $("#action-type").value;
   $("#action-day-fields").hidden = !["record_attendance", "add_school_day"].includes(kind);
   $("#action-followup-fields").hidden = kind !== "resolve_followup";
-  $("#action-contact-fields").hidden = !["queue_contact", "send_email"].includes(kind);
+  $("#action-contact-fields").hidden = kind !== "send_demo";
   $("#action-status").parentElement.hidden = kind !== "record_attendance";
 }
 
@@ -308,10 +309,11 @@ async function runAction(event) {
     state.actionBusy = true;
     button.disabled = true;
     const data = await request("/api/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    feedback.textContent = data.action.state === "sent" ? "أكّد خادم البريد إرسال الرسالة وسُجّل الإجراء." : data.action.state === "queued_local" ? "حُفظ طلب التواصل محليًا، ولم تُرسل رسالة." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال. راجع مزود البريد قبل طلب جديد." : "نُفّذ التعديل على النسخة المحلية وسُجّل في سجل الإجراءات.";
+    feedback.textContent = data.action.state === "sent_demo" ? "تم الإرسال تجريبيًا وحُفظت الرسالة في سجل الطالب." : data.action.state === "sent" ? "تم إرسال الرسالة وتسجيلها." : data.action.state === "queued_local" ? "حُفظ طلب التواصل." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال." : "تم حفظ التعديل في سجل الطالب.";
     state.actionKey = null;
     state.actionRequestId = null;
     if (["record_attendance", "resolve_followup", "add_school_day"].includes(action)) await loadAnalysis();
+    else if (action === "send_demo") selectCase(state.selected);
   } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
   finally { state.actionBusy = false; button.disabled = false; }
 }
@@ -325,8 +327,7 @@ $("#action-type").addEventListener("change", showActionFields);
 showActionFields();
 $("#chat-form").addEventListener("submit", event => { event.preventDefault(); sendChat($("#chat-input").value); });
 $("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat($("#chat-input").value); } });
-$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; state.freeformAnswerTo = null; state.freeformSave = false; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن سجلات الطلاب أو ابدأ مراجعة تفاعلية.", "assistant"); });
-$("#guided-start").addEventListener("click", () => { state.sessionId = null; state.guided = true; state.question = null; state.freeformAnswerTo = null; state.freeformSave = false; $("#chat-messages").replaceChildren(); sendChat("ابدأ مراجعة تفاعلية للملف والفترة المحددين."); });
+$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; state.freeformAnswerTo = null; state.freeformSave = false; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن طالب أو اطلب مراجعة فترة.", "assistant"); });
 for (const button of document.querySelectorAll("[data-prompt]")) button.addEventListener("click", () => sendChat(button.dataset.prompt));
 refreshStatus();
 setInterval(refreshStatus, 8000);

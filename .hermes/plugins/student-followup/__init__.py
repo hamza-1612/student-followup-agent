@@ -116,14 +116,14 @@ def register(ctx):
             return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
 
     action_schema = {"name": "student_followup_action",
-        "description": "Execute an explicitly requested attendance/follow-up change, school-day registration, local contact queue, or email with configured address and SMTP. Call this tool for a specific user command in chat and report its actual state. If actor is omitted, an unverified chat operator label is recorded. Never infer an action from analysis alone; queue_contact is not email delivery.",
+        "description": "Execute an explicitly chosen attendance/follow-up change, school-day registration, or contact. send_demo records a simulated sent message in the student's communication history after the user has reviewed its draft; it does not deliver externally. If actor is omitted, an unverified chat operator label is recorded.",
         "parameters": {"type": "object", "properties": {
-            "data_file": {"type": "string"}, "action": {"type": "string", "enum": ["record_attendance", "resolve_followup", "add_school_day", "queue_contact", "send_email"]},
+            "data_file": {"type": "string"}, "action": {"type": "string", "enum": ["record_attendance", "resolve_followup", "add_school_day", "queue_contact", "send_email", "send_demo"]},
             "actor": {"type": "string", "description": "Optional operator name; defaults to an unverified local chat user"},
             "student_id": {"type": "string"}, "day": {"type": "string"},
             "status": {"type": "string", "enum": ["present", "absent", "unrecorded"]},
             "followup_id": {"type": "string"}, "outcome": {"type": "string"},
-            "recipient_type": {"type": "string", "enum": ["guardian", "student"]},
+            "recipient_type": {"type": "string", "enum": ["guardian", "student", "teacher"]},
             "subject": {"type": "string"}, "message": {"type": "string"},
             "request_id": {"type": "string", "description": "Stable ID to prevent duplicate retries"}},
             "required": ["data_file", "action"]}}

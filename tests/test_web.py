@@ -70,11 +70,11 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(headers["Content-Security-Policy"].split(";")[0], "default-src 'self'")
         self.assertEqual(self.fetch("/static/app.js")[0], 200)
         datasets = json.loads(self.fetch("/api/datasets")[2])
-        self.assertEqual(datasets["datasets"][0]["students"], 30)
+        self.assertEqual(datasets["datasets"][0]["students"], 50)
         query = urllib.parse.urlencode({"data_file": "data/fictional_school.json",
                                         "start": "2026-09-07", "end": "2026-09-09"})
         report = json.loads(self.fetch("/api/analysis?" + query)[2])
-        self.assertEqual(report["summary"]["attendance"]["by_date"][1]["present"], 28)
+        self.assertEqual(report["summary"]["attendance"]["by_date"][1]["present"], 45)
         self.assertEqual(self.fetch("/api/analysis?data_file=../other.json&start=2026-09-07&end=2026-09-09")[0], 400)
 
     def test_reviewer_decision_is_saved_only_for_case(self):
@@ -139,22 +139,25 @@ class WebAppTests(unittest.TestCase):
             self.assertEqual(calls, [])
             second = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل أنها لم تتم بعد",
                 "session_id": first["session_id"], "answer_to": "followup:F-001"})[2])
-            self.assertEqual(second["question"]["id"], "attendance:S-004:2026-09-10")
+            self.assertEqual(second["question"]["id"], "followup:F-002")
             self.assertTrue(second["changed"])
-            third = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل غائب",
+            followup = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل أنها لم تتم بعد",
                 "session_id": first["session_id"], "answer_to": second["question"]["id"]})[2])
-            self.assertEqual(third["question"]["id"], "attendance:S-006:2026-09-11")
+            self.assertEqual(followup["question"]["id"], "attendance:S-033:2026-09-09")
+            third = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل غائب",
+                "session_id": first["session_id"], "answer_to": followup["question"]["id"]})[2])
+            self.assertEqual(third["question"]["id"], "attendance:S-004:2026-09-10")
             self.assertTrue(third["changed"])
             attendance = storage.read_data(context["data_file"])["attendance"]
-            self.assertEqual(next(row["status"] for row in attendance if row["student_id"] == "S-004"
-                                  and row["date"] == "2026-09-10"), "absent")
-            self.assertEqual(len(storage.events("actions.jsonl")), 2)
+            self.assertEqual(next(row["status"] for row in attendance if row["student_id"] == "S-033"
+                                  and row["date"] == "2026-09-09"), "absent")
+            self.assertEqual(len(storage.events("actions.jsonl")), 3)
             question = json.loads(self.fetch("/api/chat", {**context, "message": "ليش S-006؟",
                 "session_id": first["session_id"]})[2])
-            self.assertEqual(question["question"]["id"], third["question"]["id"])
+            self.assertEqual(question["question"]["id"], "next:S-006")
             self.assertIn("سجّل غائب", calls[-1][1]["input"])
             self.assertNotIn("Summarize relevant evidence", calls[-1][1]["input"])
-            self.assertEqual(len(storage.events("dialogue.jsonl")), 2)
+            self.assertEqual(len(storage.events("dialogue.jsonl")), 3)
 
     def test_guided_followup_details_are_saved_only_after_explicit_record_choice(self):
         context = {"guided": True, "data_file": "data/fictional_school.json",
@@ -167,6 +170,53 @@ class WebAppTests(unittest.TestCase):
         followup = storage.read_data(context["data_file"])["followups"][0]
         self.assertIn("تمّت المتابعة: تواصل المعلم", followup["outcome"])
         self.assertEqual(storage.events("actions.jsonl")[0]["action"], "resolve_followup")
+
+    def test_contact_draft_requires_send_choice_and_persists_in_student_history(self):
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
+        first = json.loads(self.fetch("/api/chat", {**context,
+            "message": "ابعت رسالة لولي أمر S-006"})[2])
+        self.assertEqual(first["question"]["id"], "send:S-006:guardian")
+        self.assertIn("تالا أمجد", first["question"]["text"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        changed = json.loads(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
+            "answer_to": first["question"]["id"], "message": "نرجو زيارة المدرسة غدًا.",
+            "save_answer": True})[2])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        sent = json.loads(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
+            "answer_to": changed["question"]["id"], "message": "إرسال الرسالة"})[2])
+        self.assertTrue(sent["changed"])
+        self.assertIn("تم الإرسال تجريبيًا", sent["answer"])
+        action = storage.events("actions.jsonl")[0]
+        self.assertEqual(action["state"], "sent_demo")
+        self.assertEqual(action["details"]["message"], "نرجو زيارة المدرسة غدًا.")
+        self.assertEqual(action["details"]["recipient_type"], "guardian")
+        self.assertEqual(web.case_context(context["data_file"], "S-006")[0]["details"]["message"],
+                         "نرجو زيارة المدرسة غدًا.")
+        self.assertEqual(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
+            "answer_to": changed["question"]["id"], "message": "إرسال الرسالة"})[0], 400)
+        self.assertEqual(len(storage.events("actions.jsonl")), 1)
+
+    def test_case_question_offers_next_steps_without_guided_mode(self):
+        def fake_hermes(path, body=None, timeout=3):
+            if path == "/v1/toolsets":
+                return {"data": [{"name": "student_followup", "enabled": True,
+                                  "tools": ["student_followup_info", "student_followup_analyze"]}]}
+            return {"id": "resp-demo", "output": [{"type": "message", "content": [
+                {"type": "output_text", "text": "لدى تالا حالتان تحتاجان المتابعة."}]}]}
+
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
+        with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
+             patch.object(web, "hermes_request", side_effect=fake_hermes):
+            first = json.loads(self.fetch("/api/chat", {**context, "message": "ما حالة تالا أمجد؟"})[2])
+            period = json.loads(self.fetch("/api/chat", {**context, "message": "راجع الحالات في الفترة"})[2])
+        self.assertEqual(first["question"]["id"], "next:S-006")
+        self.assertEqual(period["question"]["id"], "followup:F-001")
+        self.assertIn("مراسلة المعلم", first["question"]["options"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        second = json.loads(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
+            "answer_to": first["question"]["id"], "message": "مراسلة المعلم"})[2])
+        self.assertEqual(second["question"]["id"], "send:S-006:teacher")
+        self.assertEqual(storage.events("actions.jsonl"), [])
 
     def test_report_feedback_and_local_action_http_flow(self):
         context = {"data_file": "data/fictional_school.json", "start": "2026-09-10", "end": "2026-09-10"}

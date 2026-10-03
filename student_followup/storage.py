@@ -36,10 +36,35 @@ def active_path(name):
 
 
 def read_data(name):
-    return json.loads(active_path(name).read_text(encoding="utf-8"))
+    source = dataset_path(name)
+    overlay = OUTPUT / "datasets" / source.name
+    if not overlay.exists():
+        return json.loads(source.read_text(encoding="utf-8"))
+    local = json.loads(overlay.read_text(encoding="utf-8"))
+    fixture = json.loads(source.read_text(encoding="utf-8"))
+    local_ids = {row["student_id"] for row in local["students"]}
+    fixture_ids = {row["student_id"] for row in fixture["students"]}
+    if local_ids == fixture_ids:
+        return local
+    if not local_ids < fixture_ids:
+        raise DataError("local dataset differs from the demo roster; review it before upgrading")
+    # Preserve the operator's edits while importing new fictional students.
+    local_people = {row["student_id"]: row for row in local["students"]}
+    fixture["students"] = [{**row, **{key: value for key, value in local_people.get(row["student_id"], {}).items()
+                                   if key not in ("alias", "student_id")}} for row in fixture["students"]]
+    for section, key_fields in (("attendance", ("student_id", "date")),
+                                ("assessments", ("student_id", "subject", "date")),
+                                ("followups", ("id",))):
+        by_key = {tuple(row[key] for key in key_fields): row for row in fixture[section]}
+        by_key.update({tuple(row[key] for key in key_fields): row for row in local[section]})
+        fixture[section] = list(by_key.values())
+    fixture["school_days"] = sorted(set(fixture.get("school_days", [])) | set(local.get("school_days", [])))
+    save_data(name, fixture)
+    return fixture
 
 
 def read_bytes(name):
+    read_data(name)  # Migrates a prior demo overlay before computing its hash.
     return active_path(name).read_bytes()
 
 

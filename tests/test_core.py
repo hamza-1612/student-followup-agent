@@ -23,16 +23,18 @@ ROOT = Path(__file__).resolve().parents[1]
 class AnalysisTests(unittest.TestCase):
     def test_demo_evidence_and_uncertainty(self):
         result = analyze(build(), "2026-09-07", "2026-09-11")
-        self.assertEqual(result["summary"]["students"], 30)
-        self.assertEqual(result["summary"]["attendance_records_in_period"], 150)
-        self.assertEqual(result["summary"]["candidates"], 3)
-        self.assertEqual(result["summary"]["unresolved"], 1)
-        self.assertEqual(result["summary"]["data_quality_issues"], 2)
+        self.assertEqual(result["summary"]["students"], 50)
+        self.assertEqual(result["summary"]["attendance_records_in_period"], 250)
+        self.assertEqual(result["summary"]["candidates"], 7)
+        self.assertEqual(result["summary"]["unresolved"], 2)
+        self.assertEqual(result["summary"]["data_quality_issues"], 3)
         self.assertEqual({entry["student_id"] for entry in result["summary"]["data_quality_details"]},
-                         {"S-004", "S-006"})
+                         {"S-004", "S-006", "S-033"})
         candidates = {c["student_id"]: c for c in result["candidates"]}
-        self.assertEqual(set(candidates), {"S-002", "S-003", "S-006"})
-        self.assertEqual([c["student_id"] for c in result["candidates"]], ["S-006", "S-002", "S-003"])
+        self.assertEqual(set(candidates), {"S-002", "S-003", "S-006", "S-031", "S-032", "S-034", "S-035"})
+        self.assertEqual([c["student_id"] for c in result["candidates"]],
+                         ["S-006", "S-034", "S-002", "S-003", "S-031", "S-032", "S-035"])
+        self.assertEqual(candidates["S-006"]["alias"], "تالا أمجد")
         self.assertEqual(candidates["S-006"]["priority"], "high")
         self.assertEqual(candidates["S-002"]["priority"], "standard")
         self.assertEqual(candidates["S-003"]["priority"], "standard")
@@ -44,16 +46,35 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(candidates["S-006"]["attendance"]["unrecorded"], 1)
         self.assertIsNone(result["summary"]["tokens_used"])
 
+    def test_old_local_overlay_keeps_edits_when_demo_roster_expands(self):
+        old = build()
+        old["students"] = old["students"][:30]
+        for section in ("attendance", "assessments", "followups"):
+            old[section] = [row for row in old[section] if int(row["student_id"][2:]) <= 30]
+        row = next(row for row in old["attendance"] if row["student_id"] == "S-004"
+                   and row["date"] == "2026-09-10")
+        row["status"] = "absent"
+        with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)):
+            overlay = Path(temp) / "datasets" / "fictional_school.json"
+            overlay.parent.mkdir(parents=True)
+            overlay.write_text(json.dumps(old, ensure_ascii=False), encoding="utf-8")
+            migrated = storage.read_data("data/fictional_school.json")
+            self.assertEqual(len(migrated["students"]), 50)
+            self.assertEqual(next(row["status"] for row in migrated["attendance"]
+                                  if row["student_id"] == "S-004" and row["date"] == "2026-09-10"), "absent")
+            self.assertIn("S-050", {row["student_id"] for row in migrated["students"]})
+            self.assertEqual(len(json.loads(storage.read_bytes("data/fictional_school.json"))["students"]), 50)
+
     def test_missing_attendance_row_is_a_gap_not_an_absence(self):
         data = build()
         data["attendance"] = [row for row in data["attendance"]
                               if not (row["student_id"] == "S-001" and row["date"] == "2026-09-09")]
         result = analyze(data, "2026-09-07", "2026-09-11")
-        self.assertEqual(result["summary"]["candidates"], 3)
+        self.assertEqual(result["summary"]["candidates"], 7)
         unresolved = {case["student_id"]: case for case in result["unresolved"]}
         self.assertEqual(unresolved["S-001"]["attendance"]["absent"], 0)
         self.assertEqual(unresolved["S-001"]["attendance"]["missing_record_dates"], ["2026-09-09"])
-        self.assertEqual(result["summary"]["data_quality_issues"], 3)
+        self.assertEqual(result["summary"]["data_quality_issues"], 4)
         self.assertEqual(result["summary"]["attendance"]["by_date"][2]["missing_record"], 1)
         self.assertIn("S-001", {entry["student_id"] for entry in result["summary"]["data_quality_details"]})
 
@@ -61,27 +82,27 @@ class AnalysisTests(unittest.TestCase):
         data = build()
         data["attendance"] = [row for row in data["attendance"] if row["date"] != "2026-09-09"]
         result = analyze(data, "2026-09-09", "2026-09-09")
-        self.assertEqual(result["summary"]["attendance"]["by_date"][0]["missing_record"], 30)
-        self.assertEqual(len(result["summary"]["missing_attendance"]), 30)
+        self.assertEqual(result["summary"]["attendance"]["by_date"][0]["missing_record"], 50)
+        self.assertEqual(len(result["summary"]["missing_attendance"]), 50)
         self.assertEqual(result["summary"]["candidates"], 0)
-        self.assertEqual(result["summary"]["unresolved"], 30)
+        self.assertEqual(result["summary"]["unresolved"], 50)
         item = create_report(data, "2026-09-09", "2026-09-09", "التحقق من اكتمال حضور اليوم")
         self.assertEqual(item["purpose"], "التحقق من اكتمال حضور اليوم")
-        self.assertEqual(len(item["missing_attendance"]), 30)
+        self.assertEqual(len(item["missing_attendance"]), 50)
         future = analyze(data, "2026-12-01", "2026-12-31")
         self.assertEqual(future["summary"]["attendance"]["by_date"], [])
         self.assertEqual(future["summary"]["unresolved"], 0)
 
     def test_present_students_are_not_attendance_record_counts(self):
         result = analyze(build(), "2026-09-07", "2026-09-09")
-        self.assertEqual(result["summary"]["attendance_records_in_period"], 90)
+        self.assertEqual(result["summary"]["attendance_records_in_period"], 150)
         attendance = result["summary"]["attendance"]
         self.assertEqual([(day["present"], day["absent"], day["unrecorded"])
                           for day in attendance["by_date"]],
-                         [(30, 0, 0), (28, 2, 0), (30, 0, 0)])
-        self.assertEqual(attendance["present_student_days"], 88)
-        self.assertEqual(attendance["students_present_at_least_once"], 30)
-        self.assertEqual(attendance["students_present_every_recorded_school_day"], 28)
+                         [(50, 0, 0), (45, 5, 0), (49, 0, 1)])
+        self.assertEqual(attendance["present_student_days"], 144)
+        self.assertEqual(attendance["students_present_at_least_once"], 50)
+        self.assertEqual(attendance["students_present_every_recorded_school_day"], 44)
 
     def test_duplicate_and_conflicting_attendance_stops_analysis(self):
         data = build()
@@ -125,7 +146,8 @@ class AnalysisTests(unittest.TestCase):
             if row["student_id"] == "S-003" and row["date"] == "2026-09-11":
                 row["score"] = 66  # a 14-point drop is still descriptive only
         result = analyze(data, "2026-09-07", "2026-09-11")
-        self.assertEqual([c["student_id"] for c in result["candidates"]], ["S-006"])
+        self.assertEqual([c["student_id"] for c in result["candidates"]],
+                         ["S-006", "S-034", "S-031", "S-032", "S-035"])
         unresolved = {c["student_id"]: c for c in result["unresolved"]}
         self.assertEqual(unresolved["S-002"]["attendance"]["absent"], 1)
         self.assertEqual(unresolved["S-002"]["attendance"]["unrecorded"], 1)
@@ -134,7 +156,8 @@ class AnalysisTests(unittest.TestCase):
             if row["student_id"] == "S-003" and row["date"] == "2026-09-11":
                 row["score"] = 65  # exactly 15 percentage points
         result = analyze(data, "2026-09-07", "2026-09-11")
-        self.assertEqual({c["student_id"] for c in result["candidates"]}, {"S-003", "S-006"})
+        self.assertEqual({c["student_id"] for c in result["candidates"]},
+                         {"S-003", "S-006", "S-031", "S-032", "S-034", "S-035"})
 
     def test_absence_requires_two_in_one_full_five_date_window(self):
         data = {"students": [{"student_id": "S-A", "alias": "A"}],
@@ -170,15 +193,15 @@ class AnalysisTests(unittest.TestCase):
         info = json.loads(ctx.registrations["student_followup_info"]["handler"]({}))
         self.assertTrue(info["success"])
         self.assertEqual(info["datasets"], [{
-            "data_file": "data/fictional_school.json", "students": 30,
-            "attendance_records": 150, "assessment_records": 60,
-            "followup_records": 1,
+            "data_file": "data/fictional_school.json", "students": 50,
+            "attendance_records": 250, "assessment_records": 100,
+            "followup_records": 2,
             "attendance_period": {"start": "2026-09-07", "end": "2026-09-11"},
         }])
         tool = ctx.registrations["student_followup_analyze"]["handler"]
         result = json.loads(tool({"data_file": "data/fictional_school.json", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertTrue(result["success"])
-        self.assertEqual(result["result"]["summary"]["candidates"], 3)
+        self.assertEqual(result["result"]["summary"]["candidates"], 7)
         rejected = json.loads(tool({"data_file": "../project_sources/01-BRIEF.md", "period_start": "2026-09-07", "period_end": "2026-09-11"}))
         self.assertFalse(rejected["success"])
         daily = json.loads(ctx.registrations["student_followup_report"]["handler"]({
@@ -208,7 +231,7 @@ class AnalysisTests(unittest.TestCase):
                 execute(name, "record_attendance", "Demo teacher", "S-004",
                         day="2026-09-10", status="absent", request_id="req-1")
             self.assertEqual(analyze(storage.read_data(name), "2026-09-07", "2026-09-11")
-                             ["summary"]["missing_attendance"][0]["student_id"], "S-006")
+                             ["summary"]["missing_attendance"][0]["student_id"], "S-033")
             changed = execute(name, "resolve_followup", "Demo teacher", "S-002",
                               followup_id="F-001", outcome="Teacher met student", request_id="req-2")
             self.assertEqual(changed["details"]["before"], "Teacher requested a check-in; response pending")
@@ -291,19 +314,19 @@ print(json.dumps({'info': json.loads(ctx.handlers['student_followup_info']({})),
             run = subprocess.run([sys.executable, "-I", "-c", code, str(plugin_path)],
                                  cwd=temp, text=True, capture_output=True, check=True)
         response = json.loads(run.stdout)
-        self.assertEqual(response["info"]["datasets"][0]["students"], 30)
-        self.assertEqual(response["analysis"]["result"]["summary"]["candidates"], 3)
+        self.assertEqual(response["info"]["datasets"][0]["students"], 50)
+        self.assertEqual(response["analysis"]["result"]["summary"]["candidates"], 7)
 
     def test_cli_shows_every_case_and_preserves_json_option(self):
         args = [sys.executable, "-m", "student_followup", "--data", "data/fictional_school.json",
                 "--start", "2026-09-07", "--end", "2026-09-11"]
         report = subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=True).stdout
-        self.assertIn("حالات للمراجعة: 3 | حالات تحتاج استكمال بيانات: 1", report)
+        self.assertIn("حالات للمراجعة: 7 | حالات تحتاج استكمال بيانات: 2", report)
         for sid in ("S-002", "S-003", "S-006", "S-004"):
             self.assertIn(sid, report)
         self.assertIn("حضور غير مسجل (ليس غيابًا)", report)
         machine = subprocess.run(args + ["--json"], cwd=ROOT, text=True, capture_output=True, check=True)
-        self.assertEqual(json.loads(machine.stdout)["summary"]["candidates"], 3)
+        self.assertEqual(json.loads(machine.stdout)["summary"]["candidates"], 7)
 
     def test_reviewer_decision_is_visible_only_for_matching_data_and_period(self):
         data = ROOT / "data/fictional_school.json"

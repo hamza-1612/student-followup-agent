@@ -16,7 +16,7 @@ def case_context(data_file, student_id=None, limit=25):
         if entry.get("data_file") != data_file or entry.get("state") == "sending":
             continue
         details = {key: value for key, value in entry.get("details", {}).items()
-                   if key not in ("message", "recipient")}
+                   if key not in (() if entry.get("action") == "send_demo" else ("message", "recipient"))}
         if student_id is None or details.get("student_id") == student_id:
             rows.append({"type": "action", "at": entry["at"], "action": entry["action"],
                          "state": entry["state"], "details": details})

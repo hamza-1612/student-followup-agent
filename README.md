@@ -21,13 +21,12 @@ Errors appear on stderr with exit code 2. The default output is a concise
 Arabic report listing **all** candidates and unresolved cases. For complete
 machine-readable output, add `--json` to the analysis command.
 
-Expected counts for the included sample: 30 students; 150 dated attendance
-records; 3 review candidates (S-002, S-003, S-006); one unresolved case
-(S-004). These are fixture checks, **not educational effectiveness claims**.
-For 2026-09-07 through 2026-09-09, the actual present counts are 30, 28,
-and 30 by day; 30 distinct students were present at least once, and 28 were
-present on all three dates. There are 90 attendance **records** in that period,
-but two of those records are marked `absent`.
+Expected counts for the included sample: 50 fictional students with Arabic
+names; 250 dated attendance records; 7 review candidates and 2 unresolved
+cases. These are fixture checks, **not educational effectiveness claims**.
+For 2026-09-07 through 2026-09-09, the actual present counts are 50, 45,
+and 49 by day. There are 150 attendance **records** in that period;
+five are `absent` and one is `unrecorded`.
 S-004's unrecorded attendance is not counted as absence. Every candidate has
 observed facts, a source, and follow-ups recorded through the period end.
 The fixture uses repeated baseline scores across students by design; equal
@@ -127,8 +126,9 @@ or shared-school deployment. The operator name is an audit label, not authentica
   observed attendance; it does not invent absences. The `school_days` calendar
   catches an entire day with no attendance rows. The dashboard lists each
   student and date with `unrecorded` attendance or a missing row.
-- Click **ابدأ مراجعة تفاعلية** in the chat for a short overview and one
-  concrete question, starting with F-001's pending outcome when relevant.
+- Ask about a student or select a case; the assistant offers relevant next
+  steps without a separate review-start button. A whole-period review can
+  still begin with a concrete question about a pending follow-up.
   Buttons labeled **سجّل** explicitly update the local attendance or follow-up
   overlay and write an audit entry under an unverified chat-user label. Other
   answers only save review context. A separate free-text question does not
@@ -137,17 +137,20 @@ or shared-school deployment. The operator name is an audit label, not authentica
   range report in ignored `outputs/reports.jsonl`. The report includes actual
   attendance and the list needing completion. The Hermes report tool lets the
   model phrase the report for the requested school purpose.
-- In **إجراءات محلية**, explicitly select an action and enter the operator,
+- In **إجراءات المتابعة**, explicitly select an action and enter the operator,
   student, date or message details. Attendance and follow-up edits use an
   ignored overlay in `outputs/datasets/`; the committed fixture stays intact.
   Each action gets an audit entry in `outputs/actions.jsonl`. Register a new
-  school day before adding attendance on it. A queued contact has state
-  `queued_local` and is **not sent**. The same explicit request needs no second
-  approval. The Hermes action tool can handle the same specific requests in chat.
+  school day before adding attendance on it. The chat drafts contact to the
+  guardian, student, or teacher and waits for the user to choose **إرسال الرسالة**.
+  On successful append to `outputs/actions.jsonl`, the state is `sent_demo` and
+  the exact text appears in the student's local communication history. This
+  is a simulated send, not delivery to an external person. The same explicit
+  request needs no second approval for attendance or follow-up edits.
   In chat, the tool uses an honest unverified operator label when no name is
   supplied, and an explicit request runs without another operator-name prompt.
-  A send request cannot deliver from the fictional fixture without a recipient
-  address and SMTP configuration; it is not silently converted to a local queue.
+  A real send still requires an address and a configured transport; the demo
+  does not silently report real delivery.
 - Actual email requires `guardian_email` or `student_email` in the student row,
   and `STUDENT_FOLLOWUP_SMTP_HOST`, `STUDENT_FOLLOWUP_SMTP_USER`,
   `STUDENT_FOLLOWUP_SMTP_PASSWORD`, `STUDENT_FOLLOWUP_SMTP_FROM` (optionally
@@ -179,8 +182,9 @@ shows recorded attendance date ranges without requiring a period;
 `student_followup_report` produces an on-demand report;
 `student_followup_action` executes only named operations;
 `student_followup_feedback` saves a label and can update the rule version.
-`student_followup_context` retrieves the persistent case action/feedback/answer
-history across conversations. It omits contact message bodies and addresses.
+`student_followup_context` retrieves persistent case action/feedback/answer
+history across conversations. It includes the reviewed text of simulated demo
+messages; it omits external email bodies and addresses.
 JSON inputs are confined to `data/`. The analysis uses the same tested Python
 module as the CLI. For "the existing file" and "the whole period," Hermes
 should discover the dataset and use its full recorded attendance date range.
@@ -271,8 +275,8 @@ this local demo.
 
 Implemented: JSON validation, versioned alert rules and priority order, explicit
 school calendar, missing-attendance list, reports, audited local record edits,
-contact queue/optional SMTP, automated feedback threshold tuning, guided
-question buttons, reviewer log, Hermes plugin, fictional fixture, browser UI,
+simulated communication history/optional SMTP, automated feedback threshold
+tuning, case-specific choice buttons, reviewer log, Hermes plugin, fictional fixture, browser UI,
 and executable tests. Open: live browser-to-Hermes verification on Windows,
 actual contact configuration and authentication for real deployments, measured
 time and tokens, demonstration feedback, and video/slides. No real student data or secrets should

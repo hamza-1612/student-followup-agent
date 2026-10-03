@@ -2,123 +2,303 @@
   "students": [
     {
       "student_id": "S-001",
-      "alias": "Student 001"
+      "alias": "آدم خالد",
+      "guardian_name": "ولي أمر آدم خالد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-002",
-      "alias": "Student 002"
+      "alias": "ليان عمر",
+      "guardian_name": "ولي أمر ليان عمر",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-003",
-      "alias": "Student 003"
+      "alias": "يوسف سامر",
+      "guardian_name": "ولي أمر يوسف سامر",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-004",
-      "alias": "Student 004"
+      "alias": "مريم ناصر",
+      "guardian_name": "ولي أمر مريم ناصر",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-005",
-      "alias": "Student 005"
+      "alias": "سليم فؤاد",
+      "guardian_name": "ولي أمر سليم فؤاد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-006",
-      "alias": "Student 006"
+      "alias": "تالا أمجد",
+      "guardian_name": "ولي أمر تالا أمجد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-007",
-      "alias": "Student 007"
+      "alias": "مالك ياسر",
+      "guardian_name": "ولي أمر مالك ياسر",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-008",
-      "alias": "Student 008"
+      "alias": "جنى كريم",
+      "guardian_name": "ولي أمر جنى كريم",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-009",
-      "alias": "Student 009"
+      "alias": "محمد باسل",
+      "guardian_name": "ولي أمر محمد باسل",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-010",
-      "alias": "Student 010"
+      "alias": "نور حسن",
+      "guardian_name": "ولي أمر نور حسن",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-011",
-      "alias": "Student 011"
+      "alias": "ياسين علي",
+      "guardian_name": "ولي أمر ياسين علي",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-012",
-      "alias": "Student 012"
+      "alias": "رزان مؤيد",
+      "guardian_name": "ولي أمر رزان مؤيد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-013",
-      "alias": "Student 013"
+      "alias": "عمر رائد",
+      "guardian_name": "ولي أمر عمر رائد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-014",
-      "alias": "Student 014"
+      "alias": "سارة مازن",
+      "guardian_name": "ولي أمر سارة مازن",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-015",
-      "alias": "Student 015"
+      "alias": "حمزة عادل",
+      "guardian_name": "ولي أمر حمزة عادل",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-016",
-      "alias": "Student 016"
+      "alias": "لين أحمد",
+      "guardian_name": "ولي أمر لين أحمد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-017",
-      "alias": "Student 017"
+      "alias": "زيد إبراهيم",
+      "guardian_name": "ولي أمر زيد إبراهيم",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-018",
-      "alias": "Student 018"
+      "alias": "هبة وليد",
+      "guardian_name": "ولي أمر هبة وليد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-019",
-      "alias": "Student 019"
+      "alias": "أمير خالد",
+      "guardian_name": "ولي أمر أمير خالد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-020",
-      "alias": "Student 020"
+      "alias": "دانا نائل",
+      "guardian_name": "ولي أمر دانا نائل",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-021",
-      "alias": "Student 021"
+      "alias": "إياد يوسف",
+      "guardian_name": "ولي أمر إياد يوسف",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-022",
-      "alias": "Student 022"
+      "alias": "ملك فارس",
+      "guardian_name": "ولي أمر ملك فارس",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-023",
-      "alias": "Student 023"
+      "alias": "أنس هشام",
+      "guardian_name": "ولي أمر أنس هشام",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-024",
-      "alias": "Student 024"
+      "alias": "رنا حسام",
+      "guardian_name": "ولي أمر رنا حسام",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-025",
-      "alias": "Student 025"
+      "alias": "كريم أسعد",
+      "guardian_name": "ولي أمر كريم أسعد",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-026",
-      "alias": "Student 026"
+      "alias": "جود هاني",
+      "guardian_name": "ولي أمر جود هاني",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-027",
-      "alias": "Student 027"
+      "alias": "راشد تامر",
+      "guardian_name": "ولي أمر راشد تامر",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-028",
-      "alias": "Student 028"
+      "alias": "جنى منذر",
+      "guardian_name": "ولي أمر جنى منذر",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-029",
-      "alias": "Student 029"
+      "alias": "باسل إيهاب",
+      "guardian_name": "ولي أمر باسل إيهاب",
+      "teacher_name": "معلم الصف"
     },
     {
       "student_id": "S-030",
-      "alias": "Student 030"
+      "alias": "سما علاء",
+      "guardian_name": "ولي أمر سما علاء",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-031",
+      "alias": "فارس رامي",
+      "guardian_name": "ولي أمر فارس رامي",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-032",
+      "alias": "هدى وسيم",
+      "guardian_name": "ولي أمر هدى وسيم",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-033",
+      "alias": "أحمد سائد",
+      "guardian_name": "ولي أمر أحمد سائد",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-034",
+      "alias": "لمى سعيد",
+      "guardian_name": "ولي أمر لمى سعيد",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-035",
+      "alias": "تيم حازم",
+      "guardian_name": "ولي أمر تيم حازم",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-036",
+      "alias": "ميس قاسم",
+      "guardian_name": "ولي أمر ميس قاسم",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-037",
+      "alias": "سامي طارق",
+      "guardian_name": "ولي أمر سامي طارق",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-038",
+      "alias": "آية أكرم",
+      "guardian_name": "ولي أمر آية أكرم",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-039",
+      "alias": "فادي خليل",
+      "guardian_name": "ولي أمر فادي خليل",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-040",
+      "alias": "رهف جمال",
+      "guardian_name": "ولي أمر رهف جمال",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-041",
+      "alias": "خالد هيثم",
+      "guardian_name": "ولي أمر خالد هيثم",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-042",
+      "alias": "بتول نبيل",
+      "guardian_name": "ولي أمر بتول نبيل",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-043",
+      "alias": "علي يزن",
+      "guardian_name": "ولي أمر علي يزن",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-044",
+      "alias": "ريم ماهر",
+      "guardian_name": "ولي أمر ريم ماهر",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-045",
+      "alias": "سيف مجدي",
+      "guardian_name": "ولي أمر سيف مجدي",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-046",
+      "alias": "نورا محمود",
+      "guardian_name": "ولي أمر نورا محمود",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-047",
+      "alias": "يزن خالد",
+      "guardian_name": "ولي أمر يزن خالد",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-048",
+      "alias": "فرح زياد",
+      "guardian_name": "ولي أمر فرح زياد",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-049",
+      "alias": "بلال نادر",
+      "guardian_name": "ولي أمر بلال نادر",
+      "teacher_name": "معلم الصف"
+    },
+    {
+      "student_id": "S-050",
+      "alias": "ديمة طلال",
+      "guardian_name": "ولي أمر ديمة طلال",
+      "teacher_name": "معلم الصف"
     }
   ],
   "school_days": [
@@ -878,6 +1058,506 @@
       "student_id": "S-030",
       "date": "2026-09-11",
       "status": "present"
+    },
+    {
+      "student_id": "S-031",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-031",
+      "date": "2026-09-08",
+      "status": "absent"
+    },
+    {
+      "student_id": "S-031",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-031",
+      "date": "2026-09-10",
+      "status": "absent"
+    },
+    {
+      "student_id": "S-031",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-032",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-032",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-032",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-032",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-032",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-033",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-033",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-033",
+      "date": "2026-09-09",
+      "status": "unrecorded"
+    },
+    {
+      "student_id": "S-033",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-033",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-034",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-034",
+      "date": "2026-09-08",
+      "status": "absent"
+    },
+    {
+      "student_id": "S-034",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-034",
+      "date": "2026-09-10",
+      "status": "absent"
+    },
+    {
+      "student_id": "S-034",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-035",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-035",
+      "date": "2026-09-08",
+      "status": "absent"
+    },
+    {
+      "student_id": "S-035",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-035",
+      "date": "2026-09-10",
+      "status": "absent"
+    },
+    {
+      "student_id": "S-035",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-036",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-036",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-036",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-036",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-036",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-037",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-037",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-037",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-037",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-037",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-038",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-038",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-038",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-038",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-038",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-039",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-039",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-039",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-039",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-039",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-040",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-040",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-040",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-040",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-040",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-041",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-041",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-041",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-041",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-041",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-042",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-042",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-042",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-042",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-042",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-043",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-043",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-043",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-043",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-043",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-044",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-044",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-044",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-044",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-044",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-045",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-045",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-045",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-045",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-045",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-046",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-046",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-046",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-046",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-046",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-047",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-047",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-047",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-047",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-047",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-048",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-048",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-048",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-048",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-048",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-049",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-049",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-049",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-049",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-049",
+      "date": "2026-09-11",
+      "status": "present"
+    },
+    {
+      "student_id": "S-050",
+      "date": "2026-09-07",
+      "status": "present"
+    },
+    {
+      "student_id": "S-050",
+      "date": "2026-09-08",
+      "status": "present"
+    },
+    {
+      "student_id": "S-050",
+      "date": "2026-09-09",
+      "status": "present"
+    },
+    {
+      "student_id": "S-050",
+      "date": "2026-09-10",
+      "status": "present"
+    },
+    {
+      "student_id": "S-050",
+      "date": "2026-09-11",
+      "status": "present"
     }
   ],
   "assessments": [
@@ -1300,6 +1980,286 @@
       "date": "2026-09-11",
       "score": 80,
       "max_score": 100
+    },
+    {
+      "student_id": "S-031",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-031",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-032",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-032",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 62,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-033",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-033",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-034",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-034",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 62,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-035",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-035",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-036",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-036",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-037",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-037",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-038",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-038",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-039",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-039",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-040",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-040",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-041",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-041",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-042",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-042",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-043",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-043",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-044",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-044",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-045",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-045",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-046",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-046",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-047",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-047",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-048",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-048",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-049",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-049",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-050",
+      "subject": "Mathematics",
+      "date": "2026-08-28",
+      "score": 80,
+      "max_score": 100
+    },
+    {
+      "student_id": "S-050",
+      "subject": "Mathematics",
+      "date": "2026-09-11",
+      "score": 80,
+      "max_score": 100
     }
   ],
   "followups": [
@@ -1309,6 +2269,13 @@
       "date": "2026-09-09",
       "topic": "attendance",
       "outcome": "Teacher requested a check-in; response pending"
+    },
+    {
+      "id": "F-002",
+      "student_id": "S-035",
+      "date": "2026-09-09",
+      "topic": "attendance",
+      "outcome": "Teacher requested a family check-in; response pending"
     }
   ]
 }
