@@ -69,8 +69,11 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("مرصد الطلاب".encode(), page)
         self.assertEqual(headers["Content-Security-Policy"].split(";")[0], "default-src 'self'")
         self.assertEqual(self.fetch("/static/app.js")[0], 200)
+        self.assertIn("ما حالة تالا؟".encode(), page)
         datasets = json.loads(self.fetch("/api/datasets")[2])
         self.assertEqual(datasets["datasets"][0]["students"], 50)
+        names = json.loads(self.fetch("/api/students?data_file=data%2Ffictional_school.json")[2])["students"]
+        self.assertEqual(names[5]["name"], "تالا أمجد")
         query = urllib.parse.urlencode({"data_file": "data/fictional_school.json",
                                         "start": "2026-09-07", "end": "2026-09-09"})
         report = json.loads(self.fetch("/api/analysis?" + query)[2])
@@ -135,6 +138,8 @@ class WebAppTests(unittest.TestCase):
              patch.object(web, "hermes_request", side_effect=fake_hermes):
             first = json.loads(self.fetch("/api/chat", {**context, "message": "ابدأ المراجعة"})[2])
             self.assertEqual(first["question"]["id"], "followup:F-001")
+            self.assertIn("ليان عمر", first["question"]["text"])
+            self.assertNotIn("S-002", first["question"]["text"])
             self.assertEqual(len(first["question"]["options"]), 4)
             self.assertEqual(calls, [])
             second = json.loads(self.fetch("/api/chat", {**context, "message": "سجّل أنها لم تتم بعد",
@@ -207,8 +212,9 @@ class WebAppTests(unittest.TestCase):
         context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
         with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
              patch.object(web, "hermes_request", side_effect=fake_hermes):
-            first = json.loads(self.fetch("/api/chat", {**context, "message": "ما حالة تالا أمجد؟"})[2])
+            first = json.loads(self.fetch("/api/chat", {**context, "message": "ما حالة تالا؟"})[2])
             period = json.loads(self.fetch("/api/chat", {**context, "message": "راجع الحالات في الفترة"})[2])
+        self.assertEqual(self.fetch("/api/chat", {**context, "message": "ما حالة جنى؟"})[0], 400)
         self.assertEqual(first["question"]["id"], "next:S-006")
         self.assertEqual(period["question"]["id"], "followup:F-001")
         self.assertIn("مراسلة المعلم", first["question"]["options"])

@@ -74,20 +74,20 @@ def guided_question(result, answered):
             key = "followup:" + followup["id"]
             if "pending" in followup["outcome"].lower() and key not in answered:
                 return {"id": key, "student_id": case["student_id"],
-                        "text": f"المعلم طلب متابعة {case['student_id']} يوم {followup['date']} (رقمها {followup['id']}). هل تمت؟",
+                        "text": f"المعلم طلب متابعة {case['alias']} يوم {followup['date']}. هل تمت؟",
                         "options": ["سجّل أنها تمّت واكتب النتيجة", "سجّل أنها لم تتم بعد", "لا أعرف", "تفصيل آخر"]}
     for item in result["summary"]["missing_attendance"]:
         key = "attendance:" + item["student_id"] + ":" + item["date"]
         if key not in answered:
             return {"id": key, "student_id": item["student_id"],
-                    "text": f"ما حالة حضور {item['student_id']} في {item['date']}؟",
+                    "text": f"ما حالة حضور {item['alias']} في {item['date']}؟",
                     "options": ["سجّل حاضر", "سجّل غائب", "ما زال غير معروف", "تفصيل آخر"]}
     return None
 
 
 def review_opening(result):
     summary = result["summary"]
-    flagged = "، ".join(case["student_id"] for case in result["candidates"]) or "لا أحد"
+    flagged = "، ".join(case["alias"] for case in result["candidates"]) or "لا أحد"
     return (f"راجعت {summary['students']} طالبًا للفترة {result['period']['start']} إلى "
             f"{result['period']['end']}. طلاب يحتاجون متابعة: {flagged}. "
             f"هناك {len(summary['missing_attendance'])} سجلات حضور تحتاج استكمالًا.")
@@ -113,9 +113,16 @@ def case_by_id(result, data_file, student_id):
 
 
 def mentioned_case(message, result, data_file):
-    for person in read_data(data_file)["students"]:
+    students = read_data(data_file)["students"]
+    for person in students:
         if person["student_id"].lower() in message.lower() or person["alias"] in message:
             return case_by_id(result, data_file, person["student_id"])
+    first_name_matches = [person for person in students if re.search(
+        rf"(?<!\w){re.escape(person['alias'].split()[0])}(?!\w)", message)]
+    if len(first_name_matches) == 1:
+        return case_by_id(result, data_file, first_name_matches[0]["student_id"])
+    if len(first_name_matches) > 1:
+        raise DataError("يوجد أكثر من طالب بهذا الاسم؛ اكتب الاسم الكامل")
     return None
 
 
@@ -311,16 +318,17 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
             "data_file": data_file, "period": {"start": start, "end": end}})
         answered = session["answered"] + [answer_to]
         history = session["history"] + [{"question": pending["text"], "answer": message.strip()}]
+        current_case = case_by_id(result, data_file, pending["student_id"])
         if action:
             result = report(data_file, start, end)
+            current_case = case_by_id(result, data_file, pending["student_id"])
             detail = action["details"]
             if action["action"] == "record_attendance":
-                reply = f"سجّلت حضور {detail['student_id']} في {detail['day']} كـ{'حاضر' if detail['after'] == 'present' else 'غائب'} على النسخة المحلية."
+                reply = f"سجّلت حضور {current_case['alias'] if current_case else pending['student_id']} في {detail['day']} كـ{'حاضر' if detail['after'] == 'present' else 'غائب'}."
             else:
-                reply = f"حدّثت متابعة {detail['followup_id']} للطالب {detail['student_id']} إلى: {detail['after']}."
+                reply = f"حدّثت متابعة {current_case['alias'] if current_case else pending['student_id']} إلى: {detail['after']}."
         else:
             reply = "دوّنت إجابتك في المراجعة. لم أعدّل سجل الطالب."
-        current_case = case_by_id(result, data_file, pending["student_id"])
         question = guided_question(result, answered) if guided else next_question(current_case) if current_case else None
         if not question:
             reply += " انتهت الأسئلة الحالية؛ يمكنك طلب إجراء أو تقرير من المحادثة."
@@ -421,6 +429,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(STATIC / "app.js", "text/javascript; charset=utf-8")
             if route.path == "/api/datasets":
                 return self._json(200, {"datasets": dataset_catalog()})
+            if route.path == "/api/students":
+                students = read_data(query.get("data_file", [""])[0])["students"]
+                return self._json(200, {"students": [{"student_id": row["student_id"],
+                                                       "name": row["alias"]} for row in students]})
             if route.path == "/api/status":
                 return self._json(200, hermes_status())
             if route.path == "/api/context":

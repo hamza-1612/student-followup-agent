@@ -36,7 +36,7 @@ async function loadDatasets() {
   const select = $("#dataset-select");
   select.replaceChildren();
   for (const item of data.datasets) {
-    const option = node("option", "", `${item.data_file} · ${item.students} طالبًا`);
+    const option = node("option", "", `بيانات الطلاب · ${item.students} طالبًا`);
     option.value = item.data_file;
     select.append(option);
   }
@@ -44,13 +44,26 @@ async function loadDatasets() {
   state.dataset = data.datasets[0].data_file;
   select.value = state.dataset;
   applyDatasetDates(data.datasets[0]);
-  select.addEventListener("change", () => {
+  select.addEventListener("change", async () => {
     const item = data.datasets.find((entry) => entry.data_file === select.value);
     state.dataset = item.data_file;
     applyDatasetDates(item);
-    loadAnalysis();
+    await loadStudents();
+    await loadAnalysis();
   });
+  await loadStudents();
   await loadAnalysis();
+}
+
+async function loadStudents() {
+  const data = await request(`/api/students?${new URLSearchParams({ data_file: state.dataset })}`);
+  const select = $("#feedback-student");
+  select.replaceChildren();
+  for (const student of data.students) {
+    const option = node("option", "", student.name);
+    option.value = student.student_id;
+    select.append(option);
+  }
 }
 
 function applyDatasetDates(item) {
@@ -109,7 +122,7 @@ function renderReport() {
   missingList.replaceChildren();
   if (!missing.length) missingList.append(node("p", "empty", "كل أيام الدوام المعروفة لها حالة مسجلة لكل طالب في هذه الفترة."));
   for (const item of missing) {
-    missingList.append(node("div", "missing-row", `${item.alias} · ${item.student_id} · ${item.date} · ${item.reason === "unrecorded" ? "غير مسجل" : "سجل مفقود"}`));
+    missingList.append(node("div", "missing-row", `${item.alias} · ${item.date} · ${item.reason === "unrecorded" ? "غير مسجل" : "سجل مفقود"}`));
   }
   $("#case-count").textContent = `${cases.length} حالات`;
   const list = $("#cases-list");
@@ -119,12 +132,12 @@ function renderReport() {
     const row = node("button", `case-row ${item.priority === "needs_verification" ? "unresolved" : item.priority}`);
     row.type = "button";
     row.dataset.student = item.student_id;
-    row.append(node("span", "case-initial", item.student_id.split("-").at(-1)));
+    row.append(node("span", "case-initial", item.alias.trim().slice(0, 1)));
     const copy = node("span", "case-copy");
-    copy.append(node("strong", "", `${item.alias} · ${item.student_id}`));
+    copy.append(node("strong", "", item.alias));
     copy.append(node("span", "", item.alerts.length ? item.alerts.map(alertName).join(" · ") : "سجل حضور يحتاج تحققًا"));
     row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)), node("span", "case-arrow", "‹"));
-    row.addEventListener("click", () => { selectCase(item.student_id); sendChat(`ما حالة ${item.alias} (${item.student_id}) وما الخطوة المناسبة؟`); });
+    row.addEventListener("click", () => { selectCase(item.student_id); sendChat(`ما حالة ${item.alias} وما الخطوة المناسبة؟`); });
     list.append(row);
   }
   selectCase(cases.some(item => item.student_id === state.selected) ? state.selected : cases[0]?.student_id);
@@ -132,7 +145,12 @@ function renderReport() {
 
 function priorityClass(item) { return item.priority === "high" ? "high" : item.priority === "standard" ? "standard" : "neutral"; }
 function priorityName(item) { return item.priority === "high" ? "أولوية عالية" : item.priority === "standard" ? "أولوية عادية" : "تحتاج تحققًا"; }
-function alertName(item) { return item.type === "score_drop" ? `تراجع ${item.subject}` : "غياب مسجل"; }
+function subjectName(value) { return ({ Mathematics: "الرياضيات", Arabic: "اللغة العربية", English: "اللغة الإنجليزية" })[value] || value; }
+function alertName(item) { return item.type === "score_drop" ? `تراجع في ${subjectName(item.subject)}` : "غياب مسجل"; }
+function followupDescription(item) {
+  const outcome = item.outcome.toLowerCase().includes("pending") ? "نتيجتها بانتظار التوثيق" : item.outcome;
+  return `متابعة يوم ${item.date}: ${outcome}`;
+}
 
 function block(title, lines) {
   const box = node("div", "detail-block");
@@ -160,17 +178,24 @@ function selectCase(studentId) {
     details.append(node("p", "empty", "اختر فترة أخرى أو ملف بيانات آخر."));
     return;
   }
-  $("#detail-title").textContent = `${item.alias} · ${item.student_id}`;
+  $("#detail-title").textContent = item.alias;
   $("#feedback-student").value = item.student_id;
+  const followupSelect = $("#action-followup-id");
+  followupSelect.replaceChildren();
+  for (const followup of item.previous_followups) {
+    const option = node("option", "", `متابعة ${followup.date}`);
+    option.value = followup.id;
+    followupSelect.append(option);
+  }
   $("#detail-priority").textContent = priorityName(item);
   $("#detail-priority").className = `priority-tag ${priorityClass(item)}`;
   const attendance = item.attendance;
   details.append(block("الحضور خلال الفترة", `${attendance.present} حاضر، ${attendance.absent} غائب، ${attendance.unrecorded} غير مسجل${attendance.missing_record_dates.length ? `، ${attendance.missing_record_dates.length} سجل مفقود` : ""}.`));
   if (item.alerts.length) details.append(block("المؤشرات المؤكدة", item.alerts.map(signal => {
     if (signal.type === "absence_in_five_school_days") return `${signal.count} غياب مسجل في نافذة خمسة أيام: ${signal.dates.join("، ")}. المصدر: الحضور.`;
-    return `انخفاض ${signal.subject} من ${signal.previous.percent}% (${signal.previous.date}) إلى ${signal.current.percent}% (${signal.current.date})، بفارق ${signal.drop_percentage_points} نقطة. المصدر: التقييمات.`;
+    return `انخفاض ${subjectName(signal.subject)} من ${signal.previous.percent}% (${signal.previous.date}) إلى ${signal.current.percent}% (${signal.current.date})، بفارق ${signal.drop_percentage_points} نقطة. المصدر: التقييمات.`;
   })));
-  details.append(block("المتابعة السابقة", item.previous_followups.length ? item.previous_followups.map(f => `${f.id} · ${f.date} · ${f.topic}: ${f.outcome}`) : "لا توجد متابعة سابقة في الملف حتى نهاية الفترة."));
+  details.append(block("المتابعة السابقة", item.previous_followups.length ? item.previous_followups.map(followupDescription) : "لا توجد متابعة سابقة حتى نهاية الفترة."));
   if (item.missing_information.length) details.append(block("معلومات تحتاج تحققًا", item.missing_information.map(info => {
     if (info.startsWith("Attendance unrecorded on: ")) return `حضور غير مسجل في ${info.split(": ")[1]}`;
     if (info.startsWith("Attendance row missing on: ")) return `سجل حضور مفقود في ${info.split(": ")[1]}`;
@@ -183,10 +208,10 @@ function selectCase(studentId) {
     if (state.selected !== item.student_id || !data.events.length) return;
     details.append(block("سجل الطالب", data.events.slice(0, 8).map(entry => {
       if (entry.action === "send_demo") return `${entry.at.slice(0, 10)} · تم الإرسال تجريبيًا إلى ${({guardian:"ولي الأمر",student:"الطالب",teacher:"المعلم"})[entry.details.recipient_type]}: ${entry.details.message}`;
-      if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${entry.label} · ${entry.note}`;
+      if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${({confirmed:"مؤشر صحيح",false_alert:"إنذار غير صحيح",missed_case:"حالة فائتة"})[entry.label] || entry.label} · ${entry.note}`;
       if (entry.type === "review") return `${entry.at.slice(0, 10)} · قرار مراجعة: ${decisionName(entry.decision)} · ${entry.note}`;
       if (entry.type === "answer") return `${entry.at.slice(0, 10)} · إجابة: ${entry.answer}`;
-      return `${entry.at.slice(0, 10)} · ${entry.action}: ${entry.state}`;
+      return `${entry.at.slice(0, 10)} · ${({record_attendance:"تسجيل حضور",resolve_followup:"تحديث متابعة",add_school_day:"إضافة يوم دوام",queue_contact:"طلب تواصل"})[entry.action] || "إجراء متابعة"}`;
     })));
   }).catch(() => {});
 }
