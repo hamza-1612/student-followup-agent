@@ -52,8 +52,8 @@ using the app; press **Ctrl+C** to stop it. If Windows recognizes `py` but not
 The app starts or connects to the local Hermes gateway for chat when possible. On first run,
 it configures a local API key automatically. Wait for the connection indicator
 to show that chat is ready. Try asking “ما حالة تالا أمجد؟” or “مين الطلاب
-اللي حضورهم غير مسجل؟”. The analysis and review panels still work if chat is
-offline.
+اللي حضورهم غير مسجل؟”. The attendance chart and case list still work if chat
+is offline.
 
 **Next time:** from the project folder, run `git pull --ff-only` and
 `python -m web_app`. After changes to the agent instructions, start a new
@@ -77,9 +77,9 @@ app does not reach an external person.
 
 ## What the web app can do
 
-The dashboard shows daily attendance, cases, missing records, and previous
-follow-ups. The chat uses Hermes to explain a case and propose a relevant next
-step. The app runs on your computer at `127.0.0.1`. Its local bridge and
+The dashboard shows daily attendance, summary counts, and cases. Ask the chat
+for missing records, previous follow-ups, a case explanation, or a next step.
+The app runs on your computer at `127.0.0.1`. Its local bridge and
 student analysis use Python's standard library. Chat session state lives in
 the local server process; action and review records persist under `outputs/`.
 
@@ -87,7 +87,7 @@ the local server process; action and review records persist under `outputs/`.
 
 - Pick any start and end dates. A period with no known school dates returns no
   observed attendance; it does not invent absences. The `school_days` calendar
-  catches an entire day with no attendance rows. The dashboard lists each
+  catches an entire day with no attendance rows. Ask the chat to list each
   student and date with `unrecorded` attendance or a missing row.
 - Ask about a student or select a case; the assistant offers relevant next
   steps without a separate review-start button. A whole-period review can
@@ -96,12 +96,12 @@ the local server process; action and review records persist under `outputs/`.
   overlay and write an audit entry under an unverified chat-user label. Other
   answers only save review context. A separate free-text question does not
   accidentally answer the open review question.
-- Enter a purpose under **تقارير حسب الطلب** to save an on-demand daily or
-  range report in ignored `outputs/reports.jsonl`. The report includes actual
+- Ask the chat for a daily or range report with a purpose; it saves the report
+  in ignored `outputs/reports.jsonl`. The report includes actual
   attendance and the list needing completion. The Hermes report tool lets the
   model phrase the report for the requested school purpose.
-- In **إجراءات المتابعة**, explicitly select an action and enter the operator,
-  student, date or message details. Attendance and follow-up edits use an
+- Ask the chat for a specific action with its student, date, or message details.
+  Attendance and follow-up edits use an
   ignored overlay in `outputs/datasets/`; the committed fixture stays intact.
   Each action gets an audit entry in `outputs/actions.jsonl`. Register a new
   school day before adding attendance on it. The chat drafts contact to the
@@ -121,8 +121,8 @@ the local server process; action and review records persist under `outputs/`.
   SMTP uses TLS. An attempted send is audited; state `sent` means the SMTP
   server accepted it, not that a person read it. The fictional fixture has no
   email addresses. There is no SMS or WhatsApp adapter yet.
-- Label a case **المؤشر صحيح**, **إنذار غير صحيح**, or **حالة فاتت الوكيل**
-  with a reason and student ID. Feedback
+- Give the chat a case label (**المؤشر صحيح**, **إنذار غير صحيح**, or
+  **حالة فاتت الوكيل**) with a reason and student ID. Feedback
   persists in `outputs/feedback.jsonl`. After enough distinct labeled
   case/period examples, a deterministic score can suggest a candidate threshold
   change for review. Saving a label does not change active rules or train the
