@@ -75,6 +75,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("question-choice-text".encode(), script)
         self.assertIn(b'id="composer-question"', page)
         self.assertIn(b'class="composer-input"', page)
+        self.assertIn(b'id="cases-list"', page)
+        for removed in (b'id="missing-list"', b'id="detail-panel"', b'id="review-form"',
+                        b'id="feedback-form"', b'id="report-form"', b'id="action-form"'):
+            self.assertNotIn(removed, page)
         self.assertNotIn(b"question-submit", script)
         datasets = json.loads(self.fetch("/api/datasets")[2])
         self.assertEqual(datasets["datasets"][0]["students"], 50)
