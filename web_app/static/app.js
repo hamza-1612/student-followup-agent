@@ -128,7 +128,7 @@ function renderReport() {
     const copy = node("span", "case-copy");
     copy.append(node("strong", "", item.alias));
     copy.append(node("span", "", item.alerts.length ? item.alerts.map(alertName).join(" · ") : "سجل حضور يحتاج تحققًا"));
-    row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)), node("span", "case-arrow", "‹"));
+    row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)));
     row.addEventListener("click", () => sendChat(`ما حالة ${item.alias} وما الخطوة المناسبة؟`));
     list.append(row);
   }
@@ -242,7 +242,7 @@ function submitComposer() {
 function showWelcome() {
   clearQuestion();
   $("#chat-messages").replaceChildren();
-  addMessage("أهلًا! بقدر أساعدك بمراجعة سجلات الطلاب أو متابعة حالة محددة.", "assistant");
+  addMessage("اسأل عن طالب أو اختر حالة من القائمة، وسأعرض لك ما نعرفه والخطوة المناسبة.", "assistant");
   renderChoiceCard({
     text: "شو بتحب نراجع أولًا؟",
     options: ["راجع الحالات في الفترة المحددة", "ما حالة تالا أمجد؟", "اعرض سجلات الحضور غير المسجلة"]
