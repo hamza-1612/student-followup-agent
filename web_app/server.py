@@ -41,7 +41,14 @@ INSTRUCTIONS = (ROOT / "AGENTS.md").read_text(encoding="utf-8") + (
     "After a case answer or a saved follow-up outcome, decide from the latest "
     "evidence whether a next step is useful. If so, provide one contextual "
     "[QUESTION] block with short choices; otherwise do not add a question. "
-    "Do not repeat a completed contact merely because it is a default option."
+    "Do not repeat a completed contact merely because it is a default option. "
+    "A previously displayed or selected suggestion is not an instruction in a later, "
+    "separate message. A request to discuss a student calls for evidence and discussion, "
+    "not a contact draft. Draft only when the CURRENT message explicitly asks to write "
+    "or send one, or the user submits the corresponding choice. A correction such as "
+    "'I did not ask for a draft' never authorizes one. Conversation-behavior feedback "
+    "is separate from student alert feedback; do not claim it was saved or that the "
+    "model learned unless the application confirms its own feedback event."
 )
 _sessions = {}
 _sessions_lock = threading.Lock()
@@ -149,6 +156,44 @@ def contact_target(message):
     if "طالب" in message or "الطالبة" in message:
         return "student"
     return None
+
+
+def requested_contact(message):
+    """Only a present, affirmative instruction may open a contact draft."""
+    plain = re.sub(r"[\u064b-\u065f\u0670]", "", message.strip())
+    if any(term in plain for term in ("ما طلبت", "مش طالب", "بديش", "لا ترسل", "لا تبعت",
+                                     "لسا بسأل", "لم اطلب", "لم أطلب")):
+        return False
+    return bool(re.search(r"(?:ابعت|ابعث|ارسل|أرسل|اكتب|اكتبي|جهز|جهزي|حضّر|صغ|أنشئ)"
+                          r".{0,55}(?:رسالة|مسودة|تواصل)|^مراسلة\s+(?:المعلم|ولي|الطالب)", plain))
+
+
+def unsolicited_draft(answer):
+    return bool(re.search(r"(?:^|\n)\s*(?:مسودة|مرحب[اآ][،,])\s|مسودة\s+(?:ل|إلى)|[«\"]\s*مرحب[اآ]", answer))
+
+
+def case_brief(case):
+    """Grounded fallback if a model drafts contact without the current user's request."""
+    attendance = case.get("attendance", {})
+    parts = [f"{case['alias']}: حضور {attendance.get('present', 0)}، غياب مسجل {attendance.get('absent', 0)}"]
+    for alert in case.get("alerts", []):
+        if alert["type"] == "score_drop":
+            before, after = alert["previous"], alert["current"]
+            subject = "الرياضيات" if alert["subject"] == "Mathematics" else alert["subject"]
+            parts.append(f"نتيجة {subject} من {before['score']} في {before['date']} إلى {after['score']} في {after['date']}")
+    parts.append("سبب التراجع غير معروف من السجلات وحدها. ما الجانب الذي تريد مناقشته؟")
+    return "؛ ".join(parts)
+
+
+def behavior_feedback_request(message):
+    return bool(re.search(r"(?:سجل|سجّل|تسجل|تسجّل|احفظ|دوّن).{0,70}(?:تغذية راجعة|ملاحظة|تصحيح)", message))
+
+
+def remember_assistant(session_id, answer, student_id=None):
+    with _sessions_lock:
+        session = _sessions[session_id]
+        session["recent_assistant"] = (session.get("recent_assistant", []) + [
+            {"text": answer[:1000], "student_id": student_id}])[-3:]
 
 
 def contact_draft(case, recipient):
@@ -311,6 +356,23 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         session = dict(_sessions[known]) if known else None
     if session and session.get("context") != context:
         raise DataError("تغيّر الملف أو الفترة؛ ابدأ محادثة جديدة للمراجعة")
+    if behavior_feedback_request(message):
+        if not session or not all(context):
+            raise DataError("لا توجد محادثة سابقة مرتبطة بحالة لتسجيل الملاحظة")
+        recent = session.get("recent_assistant", [])
+        evidence = next((row for row in reversed(recent) if unsolicited_draft(row["text"])),
+                        recent[-1] if recent else None)
+        if not evidence:
+            raise DataError("لا يوجد رد سابق في هذه المحادثة لربط الملاحظة به")
+        row = append_event("dialogue_feedback.jsonl", {
+            "data_file": data_file, "period": {"start": start, "end": end},
+            "session_id": known, "student_id": evidence.get("student_id"),
+            "category": "premature_draft" if unsolicited_draft(evidence["text"]) else "agent_behavior",
+            "reviewer": CHAT_ACTOR, "note": message.strip()[:500],
+            "assistant_excerpt": evidence["text"][:1000]})
+        return {"answer": "سجّلت ملاحظتك على ردّ المساعد ضمن تغذية راجعة للمحادثة. لا تغيّر تقييم الطالب أو قواعد التنبيه تلقائيًا.",
+                "session_id": known, "question": None, "changed": False,
+                "feedback_id": row["at"]}
     choice_case_id = None
     if answer_to and answer_to.startswith("confirm_attendance:"):
         pending = session.get("pending") if session else None
@@ -481,7 +543,7 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         sid = choice_case_id or (session.get("pending") or {}).get("student_id")
         case = case_by_id(case_result, data_file, sid)
     recipient = contact_target(message) if case else None
-    if case and recipient and any(term in message for term in ("ابعت", "ابعث", "أرسل", "ارسل", "رسالة", "مراسلة", "تواصل")):
+    if case and recipient and requested_contact(message):
         question = send_question(case, recipient)
         if not known:
             known = uuid.uuid4().hex
@@ -489,7 +551,7 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
             _sessions[known] = {"context": context, "response_id": session.get("response_id") if session else None,
                                 "answered": session.get("answered", []) if session else [],
                                 "history": session.get("history", []) if session else [],
-                                "pending": question}
+                                "pending": question, "recent_assistant": session.get("recent_assistant", []) if session else []}
         return {"answer": "جهّزت الرسالة للمراجعة. اختر إرسالها أو تعديلها.",
                 "session_id": known, "question": question}
     status = hermes_status()
@@ -510,6 +572,8 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
                          "next question is useful; do not default to a contact menu or repeat "
                          "a completed follow-up. Give no choices if there is nothing to decide.")
     answer, suggested, response_id = model_response(message, previous, context_note)
+    if case and not requested_contact(message) and unsolicited_draft(answer):
+        answer, suggested = case_brief(case), None
     question = model_question(suggested, case, case_result)
     with _sessions_lock:
         if not known:
@@ -518,7 +582,9 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
             _sessions.pop(next(iter(_sessions)))
         _sessions[known] = {"context": context, "response_id": response_id,
                             "answered": session.get("answered", []) if session else [],
-                            "history": session.get("history", []) if session else [], "pending": question}
+                            "history": session.get("history", []) if session else [], "pending": question,
+                            "recent_assistant": session.get("recent_assistant", []) if session else []}
+    remember_assistant(known, answer, case["student_id"] if case else None)
     return {"answer": answer, "session_id": known, "question": question}
 
 

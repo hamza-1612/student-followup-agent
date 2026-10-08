@@ -73,6 +73,9 @@ class WebAppTests(unittest.TestCase):
         script = self.fetch("/static/app.js")[2]
         self.assertIn("showWelcome();".encode(), script)
         self.assertIn("question-choice-text".encode(), script)
+        self.assertIn(b'id="composer-question"', page)
+        self.assertIn(b'class="composer-input"', page)
+        self.assertNotIn(b"question-submit", script)
         datasets = json.loads(self.fetch("/api/datasets")[2])
         self.assertEqual(datasets["datasets"][0]["students"], 50)
         names = json.loads(self.fetch("/api/students?data_file=data%2Ffictional_school.json")[2])["students"]
@@ -232,6 +235,42 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(self.fetch("/api/chat", {**context, "session_id": first["session_id"],
             "answer_to": changed["question"]["id"], "message": "إرسال الرسالة"})[0], 400)
         self.assertEqual(len(storage.events("actions.jsonl")), 1)
+
+    def test_separate_case_request_cannot_inherit_a_draft_choice(self):
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
+        web._sessions["prior-choice"] = {"context": (context["data_file"], context["start"], context["end"]),
+            "response_id": "previous", "answered": [], "history": [],
+            "pending": {"id": "model:old", "student_id": "S-032", "text": "ما الخطوة؟",
+                        "options": ["أكتب مسودة رسالة لولي أمرها", "تفصيل آخر"]}}
+        draft = "مسودة لوليّ أمر هدى: «مرحبًا، نود الاطمئنان على هدى.» هل تريدين إرسالها؟"
+        with patch.dict(os.environ, {"API_SERVER_KEY": "local-test"}), \
+             patch.object(web, "hermes_status", return_value={"ready": True}), \
+             patch.object(web, "model_response", return_value=(draft, None, "response-new")) as model:
+            reply = json.loads(self.fetch("/api/chat", {**context, "session_id": "prior-choice",
+                "message": "تمام تعال نحكي عن هدى وسيم"})[2])
+        self.assertEqual(model.call_args.args[0], "تمام تعال نحكي عن هدى وسيم")
+        self.assertNotIn("مسودة", reply["answer"])
+        self.assertIn("80", reply["answer"])
+        self.assertIn("62", reply["answer"])
+        self.assertIsNone(reply["question"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+
+    def test_behavior_correction_is_saved_separately_from_alert_feedback(self):
+        context = {"data_file": "data/fictional_school.json", "start": "2026-09-07", "end": "2026-09-11"}
+        web._sessions["correction"] = {"context": (context["data_file"], context["start"], context["end"]),
+            "response_id": "prior", "answered": [], "history": [], "pending": None,
+            "recent_assistant": [
+                {"text": "مسودة لوليّ أمر هدى: «مرحبًا»", "student_id": "S-032"},
+                {"text": "معك حق، استعجلت.", "student_id": "S-032"}]}
+        reply = json.loads(self.fetch("/api/chat", {**context, "session_id": "correction",
+            "message": "ممكن تسجّل ردك السابق كتغذية راجعة عشان تتحسّن؟"})[2])
+        self.assertIn("سجّلت", reply["answer"])
+        row = storage.events("dialogue_feedback.jsonl")[0]
+        self.assertEqual(row["student_id"], "S-032")
+        self.assertEqual(row["category"], "premature_draft")
+        self.assertEqual(row["session_id"], "correction")
+        self.assertEqual(storage.events("feedback.jsonl"), [])
+        self.assertEqual(storage.events("actions.jsonl"), [])
 
     def test_case_question_offers_next_steps_without_guided_mode(self):
         def fake_hermes(path, body=None, timeout=3):

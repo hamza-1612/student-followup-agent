@@ -123,13 +123,12 @@ the local server process; action and review records persist under `outputs/`.
   email addresses. There is no SMS or WhatsApp adapter yet.
 - Label a case **المؤشر صحيح**, **إنذار غير صحيح**, or **حالة فاتت الوكيل**
   with a reason and student ID. Feedback
-  persists in `outputs/feedback.jsonl`. After at least eight distinct labeled
-  case/period examples, including three of each class, a deterministic score
-  checks threshold candidates and automatically promotes a version with at
-  least 0.1 greater balanced accuracy. The active thresholds are saved in
-  `outputs/rules.json` and changes in `outputs/policy_history.jsonl`. This
-  adjusts rules, not model weights or source code. The initial rules remain
-  until enough evidence exists. Missing attendance never becomes an absence.
+  persists in `outputs/feedback.jsonl`. After enough distinct labeled
+  case/period examples, a deterministic score can suggest a candidate threshold
+  change for review. Saving a label does not change active rules or train the
+  model. Conversation behavior corrections from chat are stored separately in
+  `outputs/dialogue_feedback.jsonl`, linked to the session and student when known.
+  Missing attendance never becomes an absence.
 
 These actions are a **single-operator local demo**. Before connecting real
 student records, add school identity/permissions, a secure data source, contact
@@ -146,7 +145,7 @@ shows recorded attendance date ranges without requiring a period;
 `student_followup_analyze` applies the active review rules to a chosen period;
 `student_followup_report` produces an on-demand report;
 `student_followup_action` executes only named operations;
-`student_followup_feedback` saves a label and can update the rule version.
+`student_followup_feedback` saves a student alert label without changing active rules.
 `student_followup_context` retrieves persistent case action/feedback/answer
 history across conversations. It includes the reviewed text of simulated demo
 messages; it omits external email bodies and addresses.
@@ -268,7 +267,7 @@ priority appears first. These are review priorities, not educational diagnoses.
 Recorded absence and a lower score below the thresholds are descriptive facts,
 not alerts. Missing attendance remains a verification case and is never counted
 as absence; a flagged case can also carry missing-information warnings. The
-local feedback loop can change these thresholds in the UI and Hermes plugin;
+feedback can suggest a policy for human review but cannot change these thresholds in the UI or Hermes plugin;
 the standalone CLI keeps the original defaults unless explicitly extended.
 
 The agent asks for a missing fact when needed. Analysis or saving a review
@@ -293,8 +292,9 @@ this local demo.
 
 Implemented: JSON validation, versioned alert rules and priority order, explicit
 school calendar, missing-attendance list, reports, audited local record edits,
-simulated communication history/optional SMTP, automated feedback threshold
-tuning, case-specific choice buttons, reviewer log, Hermes plugin, fictional fixture, browser UI,
+simulated communication history/optional SMTP, advisory feedback evaluation,
+choices integrated into the chat composer, separate conversation behavior feedback,
+reviewer log, Hermes plugin, fictional fixture, browser UI,
 and executable tests. Open: actual contact configuration and authentication
 for real deployments, measured time and tokens, demonstration feedback, and
 video/slides. No real student data or secrets should be committed. `.gitignore` excludes local credentials and private logs.

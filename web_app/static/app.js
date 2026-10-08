@@ -281,22 +281,27 @@ function customChoice(option) {
 }
 
 function disableQuestionCard(card, disabled) {
-  card.panel.querySelectorAll("button, input, textarea").forEach(control => {
+  card.panel.querySelectorAll("button, input").forEach(control => {
     control.disabled = disabled || card.closed;
   });
 }
 
-function settleQuestionCard(card, message) {
-  card.closed = true;
-  card.panel.classList.add("question-settled");
-  disableQuestionCard(card, true);
-  card.panel.append(node("span", "question-status", message));
+function clearQuestion() {
+  state.activeQuestionCard = null;
+  state.question = null;
+  const panel = $("#composer-question");
+  panel.replaceChildren();
+  panel.hidden = true;
+  $("#chat-input").placeholder = "اسأل عن طالب أو حالة…";
+  $("#chat-input").maxLength = 4000;
 }
 
-function renderChoiceCard(box, question, starter = false) {
+function renderChoiceCard(question, starter = false) {
+  clearQuestion();
   if (!question || !Array.isArray(question.options) || !question.options.length) return;
-  const panel = node("form", "question-panel");
-  const card = { panel, closed: false };
+  const panel = $("#composer-question");
+  panel.hidden = false;
+  const card = { panel, closed: false, selected: null, starter, question };
   const heading = node("div", "question-heading");
   heading.append(node("strong", "", question.text));
   const close = node("button", "question-close", "×");
@@ -305,9 +310,7 @@ function renderChoiceCard(box, question, starter = false) {
   close.setAttribute("aria-label", "إخفاء الخيارات");
   close.addEventListener("click", () => {
     if (state.chatBusy) return;
-    card.closed = true;
-    panel.replaceChildren(node("span", "question-status", "تم إخفاء الخيارات. يمكنك متابعة المحادثة بكتابة رسالتك."));
-    if (state.activeQuestionCard === card) state.activeQuestionCard = null;
+    clearQuestion();
   });
   heading.append(close);
   panel.append(heading);
@@ -327,65 +330,47 @@ function renderChoiceCard(box, question, starter = false) {
   }
   panel.append(choices);
 
-  const extra = node("textarea", "question-freeform");
-  extra.rows = 2;
-  extra.maxLength = question.id?.startsWith("send:") ? 2000 : 500;
-  extra.placeholder = "اكتب إجابتك هنا…";
-  extra.setAttribute("aria-label", "اكتب إجابتك");
-  extra.hidden = true;
-  panel.append(extra);
-
-  const actions = node("div", "question-actions");
-  const submit = node("button", "question-submit", starter ? "ابدأ" : "التالي");
-  submit.type = "submit";
-  submit.disabled = true;
-  actions.append(submit);
-  panel.append(actions);
-
   choices.addEventListener("change", () => {
     const selected = choices.querySelector("input:checked")?.value;
-    extra.hidden = !selected || !customChoice(selected);
-    extra.required = !extra.hidden;
+    card.selected = selected;
+    const input = $("#chat-input");
+    input.maxLength = question.id?.startsWith("send:") ? 2000 : 4000;
     if (selected === "تعديل الرسالة") {
-      extra.placeholder = "اكتب الرسالة المعدّلة…";
-      if (!extra.value) extra.value = question.draft || "";
+      input.placeholder = "اكتب الرسالة المعدّلة…";
+      input.value = question.draft || "";
     } else if (selected?.includes("اكتب النتيجة")) {
-      extra.placeholder = "اكتب نتيجة المتابعة…";
+      input.placeholder = "اكتب نتيجة المتابعة…";
+      input.value = "";
+    } else if (selected === "تفصيل آخر") {
+      input.placeholder = "اكتب التفاصيل التي تعرفها…";
+      input.value = "";
     } else {
-      extra.placeholder = "اكتب التفاصيل التي تعرفها…";
+      input.placeholder = "اسأل عن طالب أو حالة…";
+      input.value = selected || "";
     }
-    submit.textContent = selected === "إرسال الرسالة" ? "إرسال الرسالة" :
-      selected === "نعم، سجّلها" || selected?.startsWith("سجّل") ? "تأكيد التسجيل" :
-      starter ? "ابدأ" : "التالي";
-    submit.disabled = !selected;
+    input.focus();
   });
-
-  panel.addEventListener("submit", event => {
-    event.preventDefault();
-    if (state.chatBusy || card.closed) return;
-    const selected = choices.querySelector("input:checked")?.value;
-    if (!selected) return;
-    const typed = customChoice(selected);
-    const message = typed ? extra.value.trim() : selected;
-    if (!message) { extra.focus(); return; }
-    const saveAnswer = typed && (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة");
-    sendChat(message, starter ? null : question.id, saveAnswer);
-  });
-
-  box.append(panel);
   state.activeQuestionCard = card;
-  scrollChatToBottom();
 }
 
-function renderQuestion(box, question) {
-  renderChoiceCard(box, question);
+function submitComposer() {
+  const input = $("#chat-input");
+  const message = input.value.trim();
+  if (!message) { input.focus(); return; }
+  const card = state.activeQuestionCard;
+  const selected = card?.selected;
+  const isAnswer = selected && (customChoice(selected) || message === selected);
+  const saveAnswer = isAnswer && customChoice(selected) &&
+    (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة" ||
+      (selected === "تفصيل آخر" && card.question.id?.startsWith("model:")));
+  sendChat(message, isAnswer && !card.starter ? card.question.id : null, saveAnswer);
 }
 
 function showWelcome() {
-  state.activeQuestionCard = null;
+  clearQuestion();
   $("#chat-messages").replaceChildren();
-  const greeting = addMessage("أهلًا! بقدر أساعدك بمراجعة سجلات الطلاب أو متابعة حالة محددة.", "assistant");
-  renderChoiceCard(greeting, {
+  addMessage("أهلًا! بقدر أساعدك بمراجعة سجلات الطلاب أو متابعة حالة محددة.", "assistant");
+  renderChoiceCard({
     text: "شو بتحب نراجع أولًا؟",
     options: ["راجع الحالات في الفترة المحددة", "ما حالة تالا أمجد؟", "اعرض سجلات الحضور غير المسجلة"]
   }, true);
@@ -395,7 +380,7 @@ function showWelcome() {
 async function sendChat(message, answerTo = null, saveAnswer = false) {
   if (state.chatBusy || !message.trim()) return;
   state.chatBusy = true;
-  $("#chat-form button").disabled = true;
+  $(".composer-input button").disabled = true;
   const previousCard = state.activeQuestionCard;
   if (previousCard) disableQuestionCard(previousCard, true);
   addMessage(message.trim(), "user");
@@ -405,10 +390,9 @@ async function sendChat(message, answerTo = null, saveAnswer = false) {
     const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo, save_answer: saveAnswer }) });
     state.sessionId = data.session_id;
     waiting.querySelector("p").textContent = data.answer;
-    if (previousCard) settleQuestionCard(previousCard, answerTo ? "تم اختيار الإجابة." : "انتهت الخيارات السابقة.");
-    state.activeQuestionCard = null;
+    clearQuestion();
     state.question = data.question;
-    renderQuestion(waiting, data.question);
+    renderChoiceCard(data.question);
     scrollChatToBottom();
     if (data.changed) await loadAnalysis(true);
   } catch (error) {
@@ -417,7 +401,7 @@ async function sendChat(message, answerTo = null, saveAnswer = false) {
     waiting.querySelector("p").textContent = error.message;
   } finally {
     state.chatBusy = false;
-    $("#chat-form button").disabled = false;
+    $(".composer-input button").disabled = false;
   }
 }
 
@@ -490,8 +474,8 @@ $("#report-form").addEventListener("submit", createReport);
 $("#action-form").addEventListener("submit", runAction);
 $("#action-type").addEventListener("change", showActionFields);
 showActionFields();
-$("#chat-form").addEventListener("submit", event => { event.preventDefault(); sendChat($("#chat-input").value); });
-$("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat($("#chat-input").value); } });
+$("#chat-form").addEventListener("submit", event => { event.preventDefault(); submitComposer(); });
+$("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitComposer(); } });
 $("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; showWelcome(); });
 showWelcome();
 refreshStatus();

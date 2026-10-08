@@ -1,10 +1,6 @@
-"""Versioned, automatic tuning from explicit reviewer labels.
-
-No model weights or source code are changed. Core data invariants stay fixed.
-"""
+"""Reviewer labels and advisory rule evaluation; labels never change active rules."""
 
 import json
-import os
 from collections import Counter
 
 from .core import DataError, analyze
@@ -51,7 +47,8 @@ def _balanced_accuracy(rows, pair):
             + sum(not _predict(row, pair) for row in negative) / len(negative)) / 2
 
 
-def _maybe_tune():
+def propose_policy():
+    """Return a candidate for offline review without writing active policy."""
     latest = {}
     for row in events("feedback.jsonl"):
         latest[(row["data_file"], row["student_id"], row["period"]["start"],
@@ -68,17 +65,10 @@ def _maybe_tune():
     score = _balanced_accuracy(rows, best)
     if best == old_pair or score < baseline + 0.1:
         return None
-    updated = {"version": current["version"] + 1, "absence_threshold": best[0],
-               "score_drop_threshold": best[1]}
-    path = OUTPUT / "rules.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(updated, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
-    append_event("policy_history.jsonl", {"before": current, "after": updated,
-                 "labels": dict(counts), "balanced_accuracy_before": round(baseline, 3),
-                 "balanced_accuracy_after": round(score, 3)})
-    return updated
+    return {"proposed": {"version": current["version"] + 1,
+                         "absence_threshold": best[0], "score_drop_threshold": best[1]},
+            "labels": dict(counts), "balanced_accuracy_before": round(baseline, 3),
+            "balanced_accuracy_after": round(score, 3)}
 
 
 def record_feedback(data_file, data, start, end, student_id, label, note):
@@ -97,5 +87,6 @@ def record_feedback(data_file, data, start, end, student_id, label, note):
         row = append_event("feedback.jsonl", {"data_file": data_file,
                            "period": {"start": start, "end": end}, "student_id": student_id,
                            "label": label, "note": note.strip(), "features": features})
-        changed = _maybe_tune()
-        return {"feedback": row, "policy": policy(), "policy_changed": changed is not None}
+        suggestion = propose_policy()
+        return {"feedback": row, "policy": policy(), "policy_changed": False,
+                "policy_suggestion": suggestion}

@@ -112,30 +112,24 @@ select:focus,input:focus,textarea:focus{border-color:#55a99d;box-shadow:0 0 0 3p
 .message.error{align-self:flex-start;background:#fff0ec;color:#a55348}
 .message-label{display:block;font-size:9px;font-weight:700;opacity:.72}
 .chat-bottom{border-top:1px solid #e9efed;padding:13px 15px 15px}
-.chat-form{border:1px solid #dce7e5;border-radius:12px;display:flex;align-items:end;padding:6px;background:#fff;gap:6px}
+.chat-form{border:1px solid #dce7e5;border-radius:12px;display:flex;flex-direction:column;background:#fff;overflow:hidden}
 .chat-form:focus-within{border-color:#55a99d}
+.composer-input{display:flex;align-items:end;gap:6px;padding:6px;width:100%}
 .chat-form textarea{border:0;box-shadow:none;background:transparent;min-height:40px;max-height:100px;resize:vertical;width:100%;font-size:12px;padding:8px;outline:0}
 .chat-form button{width:32px;height:32px;border:0;border-radius:9px;background:#197e79;color:#fff;font-size:21px}
 .chat-caption{text-align:center;margin-top:9px}
-.message.assistant:has(.question-panel){width:100%;max-width:100%;background:#f8fcfa;border:1px solid #e0ebe7}
-.question-panel{margin-top:12px;display:flex;flex-direction:column;gap:12px;white-space:normal}
-.question-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.composer-question{width:100%;border-bottom:1px solid #e7efec;max-height:min(45vh,290px);overflow-y:auto}
+.question-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:9px 11px}
 .question-heading strong{font-size:12px;line-height:1.8;color:#254f58}
-.question-close{border:0;background:transparent;color:#8a9fa0;font-size:23px;line-height:1;padding:0 5px;flex:0 0 auto}
+.chat-form .question-close{border:0;background:transparent;color:#8a9fa0;font-size:20px;line-height:1;padding:0 5px;flex:0 0 auto;width:auto;height:auto}
 .question-close:hover{color:#1d7773}
-.question-choices{border:1px solid #dae9e4;border-radius:11px;overflow:hidden;background:#fff}
-.question-option{display:flex;align-items:center;gap:10px;background:#fff;padding:11px 12px;text-align:right;color:#246d66;cursor:pointer;line-height:1.7}
+.question-choices{background:#fff}
+.question-option{display:flex;align-items:center;gap:10px;background:#fff;padding:7px 11px;text-align:right;color:#246d66;cursor:pointer;line-height:1.7;font-size:12px}
 .question-option+.question-option{border-top:1px solid #e7efec}
 .question-option:hover,.question-option:focus-within{background:#f2faf7}
 .question-option:has(input:checked){background:#eaf7f1;color:#155c56}
 .question-option input{width:16px;height:16px;flex:0 0 16px;margin:0;accent-color:#197e79}
 .question-choice-text{flex:1}
-.question-freeform{width:100%;resize:vertical;min-height:65px;padding:11px 12px;line-height:1.7}
-.question-actions{display:flex;justify-content:flex-end}
-.question-submit{border:0;background:#197e79;color:#fff;border-radius:100px;min-width:75px;padding:9px 17px;font-weight:700}
-.question-submit:hover{background:#126965}
-.question-settled .question-choices{opacity:.6}
-.question-status{font-size:11px;color:#6a8785;display:block}
 .missing-list{max-height:225px;overflow:auto}
 .missing-row{padding:8px 4px;border-bottom:1px solid #edf1ef;font-size:11px;color:#516c70}
 #action-day-fields,#action-followup-fields,#action-contact-fields{display:flex;flex-direction:column;gap:9px}
