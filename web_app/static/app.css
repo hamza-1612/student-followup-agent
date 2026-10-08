@@ -124,11 +124,10 @@ select:focus,input:focus,textarea:focus{border-color:#55a99d;box-shadow:0 0 0 3p
 .chat-form .question-close{border:0;background:transparent;color:#8a9fa0;font-size:20px;line-height:1;padding:0 5px;flex:0 0 auto;width:auto;height:auto}
 .question-close:hover{color:#1d7773}
 .question-choices{background:#fff}
-.question-option{display:flex;align-items:center;gap:10px;background:#fff;padding:7px 11px;text-align:right;color:#246d66;cursor:pointer;line-height:1.7;font-size:12px}
+.chat-form .question-option{display:flex;align-items:center;gap:10px;background:#fff;padding:7px 11px;text-align:right;color:#246d66;cursor:pointer;line-height:1.7;font-size:12px;width:100%;height:auto;border:0;border-radius:0;font-weight:inherit}
 .question-option+.question-option{border-top:1px solid #e7efec}
-.question-option:hover,.question-option:focus-within{background:#f2faf7}
-.question-option:has(input:checked){background:#eaf7f1;color:#155c56}
-.question-option input{width:16px;height:16px;flex:0 0 16px;margin:0;accent-color:#197e79}
+.chat-form .question-option:hover,.chat-form .question-option:focus-visible{background:#f2faf7}
+.chat-form .question-option:focus-visible{outline:2px solid #197e79;outline-offset:-2px}
 .question-choice-text{flex:1}
 .missing-list{max-height:225px;overflow:auto}
 .missing-row{padding:8px 4px;border-bottom:1px solid #edf1ef;font-size:11px;color:#516c70}
