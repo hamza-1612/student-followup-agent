@@ -274,8 +274,6 @@ function addMessage(text, type) {
 }
 
 
-let questionSequence = 0;
-
 function customChoice(option) {
   return option === "تفصيل آخر" || option.includes("اكتب النتيجة") || option === "تعديل الرسالة";
 }
@@ -316,40 +314,36 @@ function renderChoiceCard(question, starter = false) {
   panel.append(heading);
 
   const choices = node("div", "question-choices");
-  choices.setAttribute("role", "radiogroup");
+  choices.setAttribute("role", "group");
   choices.setAttribute("aria-label", question.text);
-  const group = "chat-question-" + ++questionSequence;
   for (const option of question.options) {
-    const label = node("label", "question-option");
-    const radio = node("input");
-    radio.type = "radio";
-    radio.name = group;
-    radio.value = option;
-    label.append(radio, node("span", "question-choice-text", option));
-    choices.append(label);
+    const button = node("button", "question-option");
+    button.type = "button";
+    button.append(node("span", "question-choice-text", option));
+    button.addEventListener("click", () => {
+      if (state.chatBusy) return;
+      if (!customChoice(option)) {
+        sendChat(option, starter ? null : question.id);
+        return;
+      }
+      card.selected = option;
+      const input = $("#chat-input");
+      input.maxLength = question.id?.startsWith("send:") ? 2000 : 4000;
+      if (option === "تعديل الرسالة") {
+        input.placeholder = "اكتب الرسالة المعدّلة…";
+        input.value = question.draft || "";
+      } else if (option.includes("اكتب النتيجة")) {
+        input.placeholder = "اكتب نتيجة المتابعة…";
+        input.value = "";
+      } else {
+        input.placeholder = "اكتب التفاصيل التي تعرفها…";
+        input.value = "";
+      }
+      input.focus();
+    });
+    choices.append(button);
   }
   panel.append(choices);
-
-  choices.addEventListener("change", () => {
-    const selected = choices.querySelector("input:checked")?.value;
-    card.selected = selected;
-    const input = $("#chat-input");
-    input.maxLength = question.id?.startsWith("send:") ? 2000 : 4000;
-    if (selected === "تعديل الرسالة") {
-      input.placeholder = "اكتب الرسالة المعدّلة…";
-      input.value = question.draft || "";
-    } else if (selected?.includes("اكتب النتيجة")) {
-      input.placeholder = "اكتب نتيجة المتابعة…";
-      input.value = "";
-    } else if (selected === "تفصيل آخر") {
-      input.placeholder = "اكتب التفاصيل التي تعرفها…";
-      input.value = "";
-    } else {
-      input.placeholder = "اسأل عن طالب أو حالة…";
-      input.value = selected || "";
-    }
-    input.focus();
-  });
   state.activeQuestionCard = card;
 }
 
@@ -359,8 +353,8 @@ function submitComposer() {
   if (!message) { input.focus(); return; }
   const card = state.activeQuestionCard;
   const selected = card?.selected;
-  const isAnswer = selected && (customChoice(selected) || message === selected);
-  const saveAnswer = isAnswer && customChoice(selected) &&
+  const isAnswer = Boolean(selected && customChoice(selected));
+  const saveAnswer = isAnswer &&
     (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة" ||
       (selected === "تفصيل آخر" && card.question.id?.startsWith("model:")));
   sendChat(message, isAnswer && !card.starter ? card.question.id : null, saveAnswer);
