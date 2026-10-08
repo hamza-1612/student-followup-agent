@@ -76,6 +76,8 @@ class WebAppTests(unittest.TestCase):
         self.assertIn(b'id="composer-question"', page)
         self.assertIn(b'class="composer-input"', page)
         self.assertIn(b'id="cases-list"', page)
+        self.assertIn(b'id="chat-messages"', page)
+        self.assertNotIn('اضغط خيارًا للمتابعة'.encode(), page)
         for removed in (b'id="missing-list"', b'id="detail-panel"', b'id="review-form"',
                         b'id="feedback-form"', b'id="report-form"', b'id="action-form"'):
             self.assertNotIn(removed, page)
