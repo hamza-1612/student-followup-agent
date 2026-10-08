@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const state = { dataset: null, report: null, selected: null, sessionId: null, chatBusy: false,
-  guided: false, question: null, freeformAnswerTo: null, freeformSave: false,
+  guided: false, question: null, activeQuestionCard: null,
   actionBusy: false, actionKey: null, actionRequestId: null,
   dataRevision: null, analysisBusy: false, revisionBusy: false, loadedDataset: null, loadedPeriod: null, detailVersion: 0 };
 
@@ -273,34 +273,131 @@ function addMessage(text, type) {
   return box;
 }
 
-function renderQuestion(box, question) {
-  if (!question || !Array.isArray(question.options)) return;
-  const panel = node("div", "question-panel");
-  panel.append(node("strong", "", question.text));
-  for (const option of question.options) {
-    const button = node("button", "question-option", option);
-    button.type = "button";
-    button.addEventListener("click", () => {
-      if (option === "تفصيل آخر" || option.includes("اكتب النتيجة") || option === "تعديل الرسالة") {
-        state.freeformAnswerTo = question.id;
-        state.freeformSave = option.includes("اكتب النتيجة") || option === "تعديل الرسالة";
-        $("#chat-input").placeholder = option === "تعديل الرسالة" ? "اكتب نص الرسالة المعدّل…" : state.freeformSave ? "اكتب نتيجة المتابعة لتحفظها…" : "اكتب التفاصيل التي تعرفها عن السؤال…";
-        $("#chat-input").focus();
-      } else sendChat(option, question.id);
-    });
-    panel.append(button);
-  }
-  box.append(panel);
+
+let questionSequence = 0;
+
+function customChoice(option) {
+  return option === "تفصيل آخر" || option.includes("اكتب النتيجة") || option === "تعديل الرسالة";
 }
 
-async function sendChat(message, answerTo = state.freeformAnswerTo, saveAnswer = state.freeformSave) {
+function disableQuestionCard(card, disabled) {
+  card.panel.querySelectorAll("button, input, textarea").forEach(control => {
+    control.disabled = disabled || card.closed;
+  });
+}
+
+function settleQuestionCard(card, message) {
+  card.closed = true;
+  card.panel.classList.add("question-settled");
+  disableQuestionCard(card, true);
+  card.panel.append(node("span", "question-status", message));
+}
+
+function renderChoiceCard(box, question, starter = false) {
+  if (!question || !Array.isArray(question.options) || !question.options.length) return;
+  const panel = node("form", "question-panel");
+  const card = { panel, closed: false };
+  const heading = node("div", "question-heading");
+  heading.append(node("strong", "", question.text));
+  const close = node("button", "question-close", "×");
+  close.type = "button";
+  close.title = "إخفاء الخيارات";
+  close.setAttribute("aria-label", "إخفاء الخيارات");
+  close.addEventListener("click", () => {
+    if (state.chatBusy) return;
+    card.closed = true;
+    panel.replaceChildren(node("span", "question-status", "تم إخفاء الخيارات. يمكنك متابعة المحادثة بكتابة رسالتك."));
+    if (state.activeQuestionCard === card) state.activeQuestionCard = null;
+  });
+  heading.append(close);
+  panel.append(heading);
+
+  const choices = node("div", "question-choices");
+  choices.setAttribute("role", "radiogroup");
+  choices.setAttribute("aria-label", question.text);
+  const group = "chat-question-" + ++questionSequence;
+  for (const option of question.options) {
+    const label = node("label", "question-option");
+    const radio = node("input");
+    radio.type = "radio";
+    radio.name = group;
+    radio.value = option;
+    label.append(radio, node("span", "question-choice-text", option));
+    choices.append(label);
+  }
+  panel.append(choices);
+
+  const extra = node("textarea", "question-freeform");
+  extra.rows = 2;
+  extra.maxLength = question.id?.startsWith("send:") ? 2000 : 500;
+  extra.placeholder = "اكتب إجابتك هنا…";
+  extra.setAttribute("aria-label", "اكتب إجابتك");
+  extra.hidden = true;
+  panel.append(extra);
+
+  const actions = node("div", "question-actions");
+  const submit = node("button", "question-submit", starter ? "ابدأ" : "التالي");
+  submit.type = "submit";
+  submit.disabled = true;
+  actions.append(submit);
+  panel.append(actions);
+
+  choices.addEventListener("change", () => {
+    const selected = choices.querySelector("input:checked")?.value;
+    extra.hidden = !selected || !customChoice(selected);
+    extra.required = !extra.hidden;
+    if (selected === "تعديل الرسالة") {
+      extra.placeholder = "اكتب الرسالة المعدّلة…";
+      if (!extra.value) extra.value = question.draft || "";
+    } else if (selected?.includes("اكتب النتيجة")) {
+      extra.placeholder = "اكتب نتيجة المتابعة…";
+    } else {
+      extra.placeholder = "اكتب التفاصيل التي تعرفها…";
+    }
+    submit.textContent = selected === "إرسال الرسالة" ? "إرسال الرسالة" :
+      selected === "نعم، سجّلها" || selected?.startsWith("سجّل") ? "تأكيد التسجيل" :
+      starter ? "ابدأ" : "التالي";
+    submit.disabled = !selected;
+  });
+
+  panel.addEventListener("submit", event => {
+    event.preventDefault();
+    if (state.chatBusy || card.closed) return;
+    const selected = choices.querySelector("input:checked")?.value;
+    if (!selected) return;
+    const typed = customChoice(selected);
+    const message = typed ? extra.value.trim() : selected;
+    if (!message) { extra.focus(); return; }
+    const saveAnswer = typed && (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة");
+    sendChat(message, starter ? null : question.id, saveAnswer);
+  });
+
+  box.append(panel);
+  state.activeQuestionCard = card;
+  scrollChatToBottom();
+}
+
+function renderQuestion(box, question) {
+  renderChoiceCard(box, question);
+}
+
+function showWelcome() {
+  state.activeQuestionCard = null;
+  $("#chat-messages").replaceChildren();
+  const greeting = addMessage("أهلًا! بقدر أساعدك بمراجعة سجلات الطلاب أو متابعة حالة محددة.", "assistant");
+  renderChoiceCard(greeting, {
+    text: "شو بتحب نراجع أولًا؟",
+    options: ["راجع الحالات في الفترة المحددة", "ما حالة تالا أمجد؟", "اعرض سجلات الحضور غير المسجلة"]
+  }, true);
+}
+
+
+async function sendChat(message, answerTo = null, saveAnswer = false) {
   if (state.chatBusy || !message.trim()) return;
   state.chatBusy = true;
   $("#chat-form button").disabled = true;
-  const oldQuestion = state.question;
-  state.question = null;
-  state.freeformAnswerTo = null;
-  state.freeformSave = false;
+  const previousCard = state.activeQuestionCard;
+  if (previousCard) disableQuestionCard(previousCard, true);
   addMessage(message.trim(), "user");
   $("#chat-input").value = "";
   const waiting = addMessage("أراجع البيانات الآن…", "assistant");
@@ -308,12 +405,20 @@ async function sendChat(message, answerTo = state.freeformAnswerTo, saveAnswer =
     const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo, save_answer: saveAnswer }) });
     state.sessionId = data.session_id;
     waiting.querySelector("p").textContent = data.answer;
+    if (previousCard) settleQuestionCard(previousCard, answerTo ? "تم اختيار الإجابة." : "انتهت الخيارات السابقة.");
+    state.activeQuestionCard = null;
     state.question = data.question;
     renderQuestion(waiting, data.question);
     scrollChatToBottom();
     if (data.changed) await loadAnalysis(true);
-  } catch (error) { state.question = oldQuestion; state.freeformAnswerTo = answerTo; state.freeformSave = saveAnswer; waiting.className = "message error"; waiting.querySelector("p").textContent = error.message; }
-  finally { state.chatBusy = false; $("#chat-form button").disabled = false; }
+  } catch (error) {
+    if (previousCard) disableQuestionCard(previousCard, false);
+    waiting.className = "message error";
+    waiting.querySelector("p").textContent = error.message;
+  } finally {
+    state.chatBusy = false;
+    $("#chat-form button").disabled = false;
+  }
 }
 
 async function saveFeedback(event) {
@@ -387,8 +492,8 @@ $("#action-type").addEventListener("change", showActionFields);
 showActionFields();
 $("#chat-form").addEventListener("submit", event => { event.preventDefault(); sendChat($("#chat-input").value); });
 $("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat($("#chat-input").value); } });
-$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; state.freeformAnswerTo = null; state.freeformSave = false; $("#chat-messages").replaceChildren(); addMessage("محادثة جديدة. اسأل عن طالب أو اطلب مراجعة فترة.", "assistant"); });
-for (const button of document.querySelectorAll("[data-prompt]")) button.addEventListener("click", () => sendChat(button.dataset.prompt));
+$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; showWelcome(); });
+showWelcome();
 refreshStatus();
 setInterval(refreshStatus, 8000);
 setInterval(refreshDataRevision, 8000);
