@@ -69,7 +69,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("مرصد الطلاب".encode(), page)
         self.assertEqual(headers["Content-Security-Policy"].split(";")[0], "default-src 'self'")
         self.assertEqual(self.fetch("/static/app.js")[0], 200)
-        self.assertIn("ما حالة تالا؟".encode(), page)
+        self.assertNotIn(b'class="suggestions"', page)
+        script = self.fetch("/static/app.js")[2]
+        self.assertIn("showWelcome();".encode(), script)
+        self.assertIn("question-choice-text".encode(), script)
         datasets = json.loads(self.fetch("/api/datasets")[2])
         self.assertEqual(datasets["datasets"][0]["students"], 50)
         names = json.loads(self.fetch("/api/students?data_file=data%2Ffictional_school.json")[2])["students"]
