@@ -173,12 +173,12 @@ function clearQuestion() {
   $("#chat-input").maxLength = 4000;
 }
 
-function renderChoiceCard(question, starter = false) {
+function renderChoiceCard(question) {
   clearQuestion();
   if (!question || !Array.isArray(question.options) || !question.options.length) return;
   const panel = $("#composer-question");
   panel.hidden = false;
-  const card = { panel, closed: false, selected: null, starter, question };
+  const card = { panel, closed: false, selected: null, question };
   const heading = node("div", "question-heading");
   heading.append(node("strong", "", question.text));
   const close = node("button", "question-close", "×");
@@ -202,7 +202,7 @@ function renderChoiceCard(question, starter = false) {
     button.addEventListener("click", () => {
       if (state.chatBusy) return;
       if (!customChoice(option)) {
-        sendChat(option, starter ? null : question.id);
+        sendChat(option, question.id);
         return;
       }
       card.selected = option;
@@ -236,17 +236,16 @@ function submitComposer() {
   const saveAnswer = isAnswer &&
     (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة" ||
       (selected === "تفصيل آخر" && card.question.id?.startsWith("model:")));
-  sendChat(message, isAnswer && !card.starter ? card.question.id : null, saveAnswer);
+  sendChat(message, isAnswer ? card.question.id : null, saveAnswer);
 }
 
-function showWelcome() {
+function resetChat() {
+  if (state.chatBusy) return;
+  state.sessionId = null;
+  state.guided = false;
   clearQuestion();
   $("#chat-messages").replaceChildren();
-  addMessage("اسأل عن طالب أو اختر حالة من القائمة، وسأعرض لك ما نعرفه والخطوة المناسبة.", "assistant");
-  renderChoiceCard({
-    text: "شو بتحب نراجع أولًا؟",
-    options: ["راجع الحالات في الفترة المحددة", "ما حالة تالا أمجد؟", "اعرض سجلات الحضور غير المسجلة"]
-  }, true);
+  $("#chat-input").value = "";
 }
 
 
@@ -281,8 +280,8 @@ async function sendChat(message, answerTo = null, saveAnswer = false) {
 $("#analyze-btn").addEventListener("click", () => loadAnalysis());
 $("#chat-form").addEventListener("submit", event => { event.preventDefault(); submitComposer(); });
 $("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitComposer(); } });
-$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; showWelcome(); });
-showWelcome();
+$("#clear-chat").addEventListener("click", resetChat);
+resetChat();
 refreshStatus();
 setInterval(refreshStatus, 8000);
 setInterval(refreshDataRevision, 8000);
