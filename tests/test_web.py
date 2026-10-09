@@ -71,12 +71,15 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(self.fetch("/static/app.js")[0], 200)
         self.assertNotIn(b'class="suggestions"', page)
         script = self.fetch("/static/app.js")[2]
-        self.assertIn("showWelcome();".encode(), script)
+        self.assertIn(b"resetChat();", script)
         self.assertIn("question-choice-text".encode(), script)
         self.assertIn(b'id="composer-question"', page)
         self.assertIn(b'class="composer-input"', page)
         self.assertIn(b'id="cases-list"', page)
         self.assertIn(b'id="chat-messages"', page)
+        self.assertIn(b'id="chat-messages" class="chat-messages" aria-live="polite"></div>', page)
+        self.assertNotIn('اسأل عن حالة أو اختر خطوة من الحوار'.encode(), page)
+        self.assertNotIn('شو بتحب نراجع أولًا؟'.encode(), script)
         self.assertNotIn('اضغط خيارًا للمتابعة'.encode(), page)
         for removed in (b'id="missing-list"', b'id="detail-panel"', b'id="review-form"',
                         b'id="feedback-form"', b'id="report-form"', b'id="action-form"'):
