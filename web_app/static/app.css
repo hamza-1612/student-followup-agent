@@ -40,7 +40,6 @@ select:focus,input:focus,textarea:focus{border-color:#20837c;box-shadow:0 0 0 3p
 .chat-panel{position:sticky;top:18px;display:flex;flex-direction:column;height:min(840px,calc(100vh - 38px));min-height:590px;box-shadow:0 18px 45px rgba(23,75,74,.07)}
 .chat-heading{display:flex;align-items:center;gap:12px;min-height:87px;padding:18px 23px;background:#163b43;color:#fff}
 .chat-heading h2{font-size:17px;letter-spacing:-.025em;margin:0}
-.chat-heading p{font-size:11px;color:#b5d6d1;margin:5px 0 0}
 .chat-avatar{width:39px;height:39px;border-radius:11px;background:#2b746e;color:#f2f9f7;display:grid;place-items:center;font-size:22px}
 .icon-button{margin-right:auto;background:#2b555c;border:1px solid #507078;border-radius:8px;color:#e0f1ed;width:34px;height:34px;font-size:18px}
 .icon-button:hover{background:#38696c}
