@@ -121,7 +121,9 @@ def page_revision(data_file):
 
 def reset_target(message, data_file):
     """Recognize an explicit local action-log clear or full register reset."""
-    request = message.strip()
+    request = re.sub(
+        r"^(?:(?:مرحبا|مرحبًا|أهلا|أهلاً|اهلا|هلا|السلام عليكم)[\s،,!؟?]+)+",
+        "", message.strip())
     if not re.match(r"^(?:(?:ممكن|لو سمحت|بدي(?: منك)?|بديك|أريد(?: منك)?|أريدك|اريد(?: منك)?)\s+)?"
                     r"(?:امسح|أمسح|إمسح|امسج|تمسج|احذف|أحذف|إحذف|تمسح|تحذف|مسح|حذف|صفّر|صفر)\b", request):
         return None

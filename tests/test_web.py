@@ -499,6 +499,21 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(storage.events("actions.jsonl"), [])
         self.assertTrue((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())
 
+    def test_chat_clears_action_history_after_greeting(self):
+        name = "data/fictional_school.json"
+        context = {"data_file": name, "start": "2026-09-07", "end": "2026-09-11"}
+        for sid, day in (("S-006", "2026-09-11"), ("S-004", "2026-09-10")):
+            action = {"data_file": name, "action": "record_attendance", "actor": "Teacher",
+                      "student_id": sid, "day": day, "status": "present"}
+            self.assertEqual(self.fetch("/api/actions", action)[0], 200)
+        response = json.loads(self.fetch("/api/chat", {**context,
+            "message": "مرحبا بدي تمسح سجل الاجراءات المحلية لتالا"})[2])
+        self.assertTrue(response["changed"])
+        self.assertIn("مسحت من سجل إجراءات تالا أمجد 1 إجراء محلي", response["answer"])
+        self.assertEqual([row["details"]["student_id"] for row in storage.events("actions.jsonl")], ["S-004"])
+        self.assertEqual(next(row["status"] for row in storage.read_data(name)["attendance"]
+                              if row["student_id"] == "S-006" and row["date"] == "2026-09-11"), "present")
+
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:
             def __init__(self):
