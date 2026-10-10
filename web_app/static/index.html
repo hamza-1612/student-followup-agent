@@ -3,48 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#123344">
+  <meta name="theme-color" content="#163b43">
   <title>مرصد الطلاب | متابعة مبكرة</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar" aria-label="معلومات المشروع">
-      <div class="brand"><span class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></span><div><strong>مرصد الطلاب</strong><small>لوحة المتابعة المبكرة</small></div></div>
-      <div class="side-section"><div class="side-label">مسار المراجعة</div><div class="side-step active"><b>01</b><span>فحص السجلات</span></div><div class="side-step"><b>02</b><span>مراجعة الأدلة</span></div><div class="side-step"><b>03</b><span>قرار المسؤول</span></div></div>
-      <div class="side-note"><span class="note-icon" aria-hidden="true">✳</span><strong>القرار بيدك</strong><p>هذه البيانات خيالية. يعرض النظام مؤشرات للمراجعة ولا يتخذ إجراءً بحق أي طالب.</p></div>
-      <div class="side-footer">نسخة العرض · بيانات مدرسية خيالية</div>
-    </aside>
+  <main class="main-area">
+    <header class="topbar">
+      <div class="brand"><span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span><div><strong>مرصد الطلاب</strong><small>متابعة مبكرة</small></div></div>
+      <div class="topbar-end"><span class="demo-label">بيانات مدرسية خيالية</span><div class="top-status" id="connection-status"><span class="status-dot"></span><span>جارٍ فحص الاتصال</span></div></div>
+    </header>
 
-    <main class="main-area">
-      <header class="topbar"><div><div class="eyebrow">لوحة المتابعة / نظرة عامة</div><h1>متابعة أوضح، قرار أهدأ.</h1><p>افحص الحضور والأداء والمتابعات السابقة، ثم راجع الخطوة التالية لكل حالة.</p></div><div class="top-status" id="connection-status"><span class="status-dot"></span><span>جارٍ فحص الاتصال</span></div></header>
+    <div class="page-heading"><h1>مراجعة حالات الطلاب</h1><p>اختر فترة، ثم افتح حالة أو اسأل المساعد عن الخطوة المناسبة.</p></div>
 
-      <section class="filter-card" aria-label="نطاق التحليل"><div class="filter-title"><span class="section-kicker">01 / نطاق البيانات</span><strong>اختر البيانات والفترة</strong></div><div class="filters"><label>بيانات الطلاب<select id="dataset-select" aria-label="ملف البيانات"></select></label><label>من تاريخ<input id="period-start" type="date"></label><label>إلى تاريخ<input id="period-end" type="date"></label><button id="analyze-btn" class="primary-button" type="button">تحديث التحليل <span aria-hidden="true">↗</span></button></div></section>
-
-      <section class="stat-grid" aria-label="ملخص الأرقام"><div class="stat-card"><span>الطلاب في الملف</span><strong id="stat-students">—</strong><small>ضمن المجموعة المختارة</small></div><div class="stat-card"><span>حالات للمراجعة</span><strong id="stat-candidates">—</strong><small>تحتاج نظر المسؤول</small></div><div class="stat-card"><span>تحتاج استكمالًا</span><strong id="stat-unresolved">—</strong><small>معلومات حضور غير مكتملة</small></div><div class="stat-card"><span>أيام حضور مثبتة</span><strong id="stat-present">—</strong><small>مجموع حالات «حاضر» في الفترة</small></div></section>
-
-      <div class="work-grid">
-        <div class="evidence-column">
-          <section class="panel attendance-panel"><div class="panel-heading"><div><span class="section-kicker">02 / الحضور</span><h2>صورة الحضور اليومية</h2></div><span class="panel-hint">حاضر · غائب · غير مسجل</span></div><div id="attendance-chart" class="attendance-chart"><p class="empty">جارٍ تحميل الحضور…</p></div><p class="muted-note">السجل غير المسجّل أو المفقود لا يُحسب غيابًا.</p></section>
-
-          <section class="panel cases-panel"><div class="panel-heading"><div><span class="section-kicker">03 / الحالات</span><h2>حالات تستحق النظر</h2></div><span class="count-badge" id="case-count">—</span></div><div id="cases-list" class="cases-list"><p class="empty">جارٍ فحص الحالات…</p></div></section>
-
-          <section class="panel"><div class="panel-heading"><div><span class="section-kicker">بيانات ناقصة</span><h2>من لم يُسجّل حضوره أو غيابه؟</h2></div><span class="count-badge" id="missing-count">—</span></div><div id="missing-list" class="missing-list"><p class="empty">جارٍ الفحص…</p></div><p class="muted-note">التواريخ من جدول الدوام إن وُجد؛ اليوم الناقص لا يعني الغياب.</p></section>
-
-          <section class="panel detail-panel" id="detail-panel"><div class="panel-heading"><div><span class="section-kicker">04 / مراجعة بشرية</span><h2 id="detail-title">اختر حالة من القائمة</h2></div><span id="detail-priority" class="priority-tag neutral">—</span></div><div id="detail-body" class="detail-body"><p class="empty">ستظهر هنا الأدلة وسجل المتابعة السابق.</p></div><form id="review-form" class="review-form" hidden><div class="review-divider"></div><label for="decision-select">قرار المراجع</label><div class="review-controls"><select id="decision-select" required><option value="verify_data">التحقق من البيانات</option><option value="follow_up_approved">اعتماد خطوة متابعة</option><option value="no_action">لا إجراء حاليًا</option></select><button class="primary-button" type="submit">حفظ القرار</button></div><label for="review-note">ملاحظة المراجع</label><textarea id="review-note" required maxlength="500" placeholder="مثال: التحقق من نتيجة المتابعة السابقة قبل أي تواصل جديد"></textarea><p class="form-footnote">يحفظ القرار محليًا فقط، ولا يرسل رسائل أو يغيّر سجل الطالب.</p><p id="review-feedback" class="form-feedback" role="status"></p></form></section>
-
-          <section class="panel"><div class="panel-heading"><div><span class="section-kicker">تعلّم من النتيجة</span><h2>قيّم مؤشر الحالة</h2></div></div><form id="feedback-form" class="review-form"><label>الطالب<select id="feedback-student" required></select></label><label>تقييم المعلم<select id="feedback-label"><option value="confirmed">المؤشر صحيح</option><option value="false_alert">إنذار غير صحيح</option><option value="missed_case">حالة فاتت الوكيل</option></select></label><label>السبب<textarea id="feedback-note" maxlength="500" required placeholder="ما الدليل على هذا التقييم؟"></textarea></label><button class="primary-button" type="submit">حفظ التقييم</button><p class="form-footnote">يساعد تقييمك المساعد على تحسين اختيار الحالات التي تستحق المتابعة.</p><p id="feedback-result" class="form-feedback" role="status"></p></form></section>
-
-          <section class="panel"><div class="panel-heading"><div><span class="section-kicker">تقارير حسب الطلب</span><h2>أنشئ تقريرًا للفترة المختارة</h2></div></div><form id="report-form" class="review-form"><label>الغرض من التقرير<input id="report-purpose" required maxlength="160" placeholder="مثال: متابعة الغياب اليومي"></label><button class="primary-button" type="submit">إنشاء التقرير</button><p id="report-result" class="form-feedback" role="status"></p></form><div id="report-body" class="detail-body"></div></section>
-
-          <section class="panel"><div class="panel-heading"><div><span class="section-kicker">إجراءات المتابعة</span><h2>نفّذ طلبًا محددًا</h2></div></div><form id="action-form" class="review-form"><label>اسم منفّذ الطلب<input id="action-actor" required maxlength="100" placeholder="المعلم أو مسؤول المدرسة"></label><label>الإجراء<select id="action-type"><option value="record_attendance">تسجيل أو تصحيح حضور الطالب المحدد</option><option value="resolve_followup">تحديث نتيجة متابعة سابقة</option><option value="add_school_day">إضافة يوم دوام</option><option value="send_demo">إرسال رسالة</option></select></label><div id="action-day-fields"><label>التاريخ<input id="action-day" type="date"></label><label>الحالة<select id="action-status"><option value="present">حاضر</option><option value="absent">غائب</option><option value="unrecorded">غير مسجل</option></select></label></div><div id="action-followup-fields" hidden><label>المتابعة<select id="action-followup-id"></select></label><label>النتيجة<textarea id="action-outcome" maxlength="500"></textarea></label></div><div id="action-contact-fields" hidden><label>المستلم<select id="action-recipient"><option value="guardian">ولي الأمر</option><option value="student">الطالب</option><option value="teacher">المعلم</option></select></label><label>الموضوع<input id="action-subject" maxlength="160"></label><label>الرسالة<textarea id="action-message" maxlength="2000"></textarea></label></div><button class="primary-button" type="submit">تنفيذ الطلب</button><p id="action-result" class="form-feedback" role="status"></p></form></section>
-        </div>
-
-        <aside class="panel chat-panel" aria-label="محادثة الوكيل"><div class="chat-heading"><div class="chat-avatar" aria-hidden="true">✳</div><div><span class="section-kicker">مساعد المراجعة</span><h2>اسأل عن الحالات</h2></div><button id="clear-chat" class="icon-button" type="button" title="محادثة جديدة" aria-label="محادثة جديدة">↺</button></div><div id="chat-messages" class="chat-messages" aria-live="polite"><div class="message assistant"><span class="message-label">مساعد المراجعة</span><p>أهلًا. اسألني عن طالب أو فترة، وسأقترح الخطوات المناسبة لتختار منها.</p></div></div><div class="chat-bottom"><form id="chat-form" class="chat-form"><label class="sr-only" for="chat-input">رسالتك</label><textarea id="chat-input" rows="2" maxlength="4000" placeholder="اسأل عن طالب أو حالة…"></textarea><button type="submit" aria-label="إرسال الرسالة" title="إرسال">↑</button></form><p class="chat-caption">اكتب سؤالك هنا، أو اختر إجابة من البطاقة داخل المحادثة.</p></div></aside>
+    <section class="filter-card" aria-label="نطاق التحليل">
+      <div class="filter-title"><strong>الفترة والبيانات</strong></div>
+      <div class="filters">
+        <label>بيانات الطلاب<select id="dataset-select" aria-label="ملف البيانات"></select></label>
+        <label>من تاريخ<input id="period-start" type="date"></label>
+        <label>إلى تاريخ<input id="period-end" type="date"></label>
+        <button id="analyze-btn" class="primary-button" type="button">تحديث التحليل</button>
       </div>
-      <footer class="page-footer">مرصد الطلاب · بيانات خيالية</footer>
-    </main>
-  </div>
+    </section>
+
+    <section class="stat-grid" aria-label="ملخص الأرقام">
+      <div class="stat-card"><span>الطلاب في الملف</span><strong id="stat-students">—</strong></div>
+      <div class="stat-card"><span>حالات للمراجعة</span><strong id="stat-candidates">—</strong></div>
+      <div class="stat-card"><span>تحتاج استكمالًا</span><strong id="stat-unresolved">—</strong></div>
+      <div class="stat-card"><span>أيام حضور مثبتة</span><strong id="stat-present">—</strong></div>
+    </section>
+
+    <div class="work-grid">
+      <section class="chat-panel" aria-label="محادثة الوكيل">
+        <div class="chat-heading"><div class="chat-avatar" aria-hidden="true">✳</div><h2>مساعد المراجعة</h2><button id="clear-chat" class="icon-button" type="button" title="محادثة جديدة" aria-label="محادثة جديدة">↺</button></div>
+        <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+        <div class="chat-bottom"><form id="chat-form" class="chat-form"><div id="composer-question" class="composer-question" hidden></div><div class="composer-input"><label class="sr-only" for="chat-input">رسالتك</label><textarea id="chat-input" rows="2" maxlength="4000" placeholder="اسأل عن طالب أو حالة…"></textarea><button type="submit" aria-label="إرسال الرسالة" title="إرسال">↑</button></div></form></div>
+      </section>
+
+      <aside class="insights-column" aria-label="ملخص الحالات والحضور">
+        <section class="panel cases-panel"><div class="panel-heading"><h2>حالات تستحق النظر</h2><span class="count-badge" id="case-count">—</span></div><div id="cases-list" class="cases-list"><p class="empty">جارٍ فحص الحالات…</p></div></section>
+        <section class="panel attendance-panel"><div class="panel-heading"><h2>الحضور اليومي</h2></div><div class="chart-legend"><span>حاضر</span><span>غائب</span><span>غير مسجل</span></div><div id="attendance-chart" class="attendance-chart"><p class="empty">جارٍ تحميل الحضور…</p></div><p class="muted-note">الحضور غير المسجّل لا يُحسب غيابًا.</p></section>
+      </aside>
+    </div>
+  </main>
 </body>
 </html>

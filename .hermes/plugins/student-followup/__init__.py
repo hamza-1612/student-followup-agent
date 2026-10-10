@@ -140,7 +140,7 @@ def register(ctx):
             return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
 
     feedback_schema = {"name": "student_followup_feedback",
-        "description": "Save explicit reviewer evidence that a signal was confirmed, false, or a missed case. The local rules may automatically improve after enough labeled cases; no separate approval is required.",
+        "description": "Save explicit reviewer evidence that a student alert was confirmed, false, or a missed case. This does not record conversation behavior and never changes active thresholds automatically.",
         "parameters": {"type": "object", "properties": {
             "data_file": {"type": "string"}, "period_start": {"type": "string"},
             "period_end": {"type": "string"}, "student_id": {"type": "string"},

@@ -247,23 +247,24 @@ class AnalysisTests(unittest.TestCase):
                         subject="Check-in", message="Please call school")
             self.assertEqual((ROOT / "data/fictional_school.json").read_bytes(), original)
 
-    def test_feedback_can_autonomously_promote_versioned_rule_after_sufficient_labels(self):
+    def test_feedback_only_proposes_rule_change_after_sufficient_labels(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)), \
              patch.object(learning, "OUTPUT", Path(temp)):
             for i in range(4):
                 storage.append_event("feedback.jsonl", {"data_file": "data/fictional_school.json",
                     "student_id": f"S-P{i}", "period": {"start": "2026-01-01", "end": "2026-01-05"},
                     "label": "confirmed", "features": {"absences_in_five": 1, "score_drop": 0}})
-            self.assertIsNone(learning._maybe_tune())
+            self.assertIsNone(learning.propose_policy())
             for i in range(4):
                 storage.append_event("feedback.jsonl", {"data_file": "data/fictional_school.json",
                     "student_id": f"S-N{i}", "period": {"start": "2026-01-01", "end": "2026-01-05"},
                     "label": "false_alert", "features": {"absences_in_five": 0, "score_drop": 0}})
-            changed = learning._maybe_tune()
-            self.assertEqual(changed["version"], 2)
-            self.assertEqual(changed["absence_threshold"], 1)
-            self.assertEqual(learning.policy(), changed)
-            self.assertEqual(len(storage.events("policy_history.jsonl")), 1)
+            suggestion = learning.propose_policy()
+            self.assertEqual(suggestion["proposed"]["version"], 2)
+            self.assertEqual(suggestion["proposed"]["absence_threshold"], 1)
+            self.assertEqual(learning.policy()["absence_threshold"], 2)
+            self.assertFalse((Path(temp) / "rules.json").exists())
+            self.assertEqual(storage.events("policy_history.jsonl"), [])
             sample = {"students": [{"student_id": "S-A", "alias": "A"}],
                       "school_days": [f"2026-01-0{i}" for i in range(1, 6)],
                       "attendance": [{"student_id": "S-A", "date": f"2026-01-0{i}",
@@ -271,6 +272,8 @@ class AnalysisTests(unittest.TestCase):
                       "assessments": [], "followups": []}
             self.assertEqual(analyze(sample, "2026-01-01", "2026-01-05")["summary"]["candidates"], 0)
             self.assertEqual(analyze(sample, "2026-01-01", "2026-01-05", learning.policy())
+                             ["summary"]["candidates"], 0)
+            self.assertEqual(analyze(sample, "2026-01-01", "2026-01-05", suggestion["proposed"])
                              ["summary"]["candidates"], 1)
 
     def test_email_adapter_requires_dataset_recipient_and_reports_smtp_acceptance(self):

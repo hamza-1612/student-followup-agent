@@ -1,8 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { dataset: null, report: null, selected: null, sessionId: null, chatBusy: false,
+const state = { dataset: null, report: null, sessionId: null, chatBusy: false,
   guided: false, question: null, activeQuestionCard: null,
-  actionBusy: false, actionKey: null, actionRequestId: null,
-  dataRevision: null, analysisBusy: false, revisionBusy: false, loadedDataset: null, loadedPeriod: null, detailVersion: 0 };
+  dataRevision: null, analysisBusy: false, revisionBusy: false };
 
 async function request(url, options = {}) {
   const response = await fetch(url, options);
@@ -26,11 +25,11 @@ function setStatus(message, ready) {
 }
 
 async function refreshDataRevision() {
-  if (!state.dataset || state.dataRevision === null || state.chatBusy || state.actionBusy || state.analysisBusy || state.revisionBusy) return;
+  if (!state.dataset || state.dataRevision === null || state.chatBusy || state.analysisBusy || state.revisionBusy) return;
   state.revisionBusy = true;
   try {
     const data = await request(`/api/revision?${new URLSearchParams({ data_file: state.dataset })}`);
-    if (data.revision !== state.dataRevision) await loadAnalysis(true);
+    if (data.revision !== state.dataRevision) await loadAnalysis();
   } catch { /* A temporary connection issue must not replace the displayed report. */ }
   finally { state.revisionBusy = false; }
 }
@@ -59,22 +58,9 @@ async function loadDatasets() {
     const item = data.datasets.find((entry) => entry.data_file === select.value);
     state.dataset = item.data_file;
     applyDatasetDates(item);
-    await loadStudents();
     await loadAnalysis();
   });
-  await loadStudents();
   await loadAnalysis();
-}
-
-async function loadStudents() {
-  const data = await request(`/api/students?${new URLSearchParams({ data_file: state.dataset })}`);
-  const select = $("#feedback-student");
-  select.replaceChildren();
-  for (const student of data.students) {
-    const option = node("option", "", student.name);
-    option.value = student.student_id;
-    select.append(option);
-  }
 }
 
 function applyDatasetDates(item) {
@@ -84,12 +70,8 @@ function applyDatasetDates(item) {
   }
 }
 
-async function loadAnalysis(preserveCase = false) {
+async function loadAnalysis() {
   const button = $("#analyze-btn");
-  const previousCase = [...(state.report?.candidates || []), ...(state.report?.unresolved || [])]
-    .find(item => item.student_id === state.selected);
-  const currentPeriod = `${$("#period-start").value}:${$("#period-end").value}`;
-  const sameContext = state.loadedDataset === state.dataset && state.loadedPeriod === currentPeriod;
   state.analysisBusy = true;
   button.disabled = true;
   button.textContent = "جارٍ الفحص…";
@@ -97,12 +79,7 @@ async function loadAnalysis(preserveCase = false) {
     const params = new URLSearchParams({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value });
     state.report = await request(`/api/analysis?${params}`);
     state.dataRevision = state.report.revision;
-    state.loadedDataset = state.dataset;
-    state.loadedPeriod = currentPeriod;
-    const cases = [...state.report.candidates, ...state.report.unresolved];
-    const resolvedName = preserveCase && sameContext && previousCase &&
-      !cases.some(item => item.student_id === previousCase.student_id) ? previousCase.alias : null;
-    renderReport(resolvedName);
+    renderReport();
   } catch (error) {
     $("#cases-list").replaceChildren(node("p", "empty", error.message));
     $("#attendance-chart").replaceChildren(node("p", "empty", "تعذّر عرض الحضور للفترة المختارة."));
@@ -113,7 +90,7 @@ async function loadAnalysis(preserveCase = false) {
   }
 }
 
-function renderReport(resolvedName = null) {
+function renderReport() {
   const summary = state.report.summary;
   $("#stat-students").textContent = summary.students;
   $("#stat-candidates").textContent = summary.candidates;
@@ -139,14 +116,6 @@ function renderReport(resolvedName = null) {
     chart.append(row);
   }
   const cases = [...state.report.candidates, ...state.report.unresolved];
-  const missing = summary.missing_attendance || [];
-  $("#missing-count").textContent = `${missing.length} سجل`;
-  const missingList = $("#missing-list");
-  missingList.replaceChildren();
-  if (!missing.length) missingList.append(node("p", "empty", "كل أيام الدوام المعروفة لها حالة مسجلة لكل طالب في هذه الفترة."));
-  for (const item of missing) {
-    missingList.append(node("div", "missing-row", `${item.alias} · ${item.date} · ${item.reason === "unrecorded" ? "غير مسجل" : "سجل مفقود"}`));
-  }
   $("#case-count").textContent = `${cases.length} حالات`;
   const list = $("#cases-list");
   list.replaceChildren();
@@ -159,106 +128,16 @@ function renderReport(resolvedName = null) {
     const copy = node("span", "case-copy");
     copy.append(node("strong", "", item.alias));
     copy.append(node("span", "", item.alerts.length ? item.alerts.map(alertName).join(" · ") : "سجل حضور يحتاج تحققًا"));
-    row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)), node("span", "case-arrow", "‹"));
-    row.addEventListener("click", () => { selectCase(item.student_id); sendChat(`ما حالة ${item.alias} وما الخطوة المناسبة؟`); });
+    row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)));
+    row.addEventListener("click", () => sendChat(`ما حالة ${item.alias} وما الخطوة المناسبة؟`));
     list.append(row);
   }
-  if (resolvedName) {
-    selectCase(null);
-    $("#detail-title").textContent = resolvedName;
-    $("#detail-priority").textContent = "تم تحديث الحالة";
-    $("#detail-priority").className = "priority-tag neutral";
-    $("#detail-body").replaceChildren(block("نتيجة التحديث", "لم تعد هذه الحالة ضمن قائمة المتابعة في الفترة المختارة. تم تحديث البيانات والأرقام المعروضة."));
-  } else selectCase(cases.some(item => item.student_id === state.selected) ? state.selected : cases[0]?.student_id);
 }
 
 function priorityClass(item) { return item.priority === "high" ? "high" : item.priority === "standard" ? "standard" : "neutral"; }
 function priorityName(item) { return item.priority === "high" ? "أولوية عالية" : item.priority === "standard" ? "أولوية عادية" : "تحتاج تحققًا"; }
 function subjectName(value) { return ({ Mathematics: "الرياضيات", Arabic: "اللغة العربية", English: "اللغة الإنجليزية" })[value] || value; }
 function alertName(item) { return item.type === "score_drop" ? `تراجع في ${subjectName(item.subject)}` : "غياب مسجل"; }
-function followupDescription(item) {
-  const outcome = item.outcome.toLowerCase().includes("pending") ? "نتيجتها بانتظار التوثيق" : item.outcome;
-  return `متابعة يوم ${item.date}: ${outcome}`;
-}
-
-function block(title, lines) {
-  const box = node("div", "detail-block");
-  box.append(node("strong", "", title));
-  const items = Array.isArray(lines) ? lines : [lines];
-  if (items.length > 1) {
-    const list = node("ul");
-    for (const line of items) list.append(node("li", "", line));
-    box.append(list);
-  } else box.append(node("p", "", items[0] || "لا توجد معلومات."));
-  return box;
-}
-
-function selectCase(studentId) {
-  const detailVersion = ++state.detailVersion;
-  state.selected = studentId || null;
-  for (const row of document.querySelectorAll(".case-row")) row.classList.toggle("selected", row.dataset.student === studentId);
-  const item = [...state.report.candidates, ...state.report.unresolved].find(entry => entry.student_id === studentId);
-  const details = $("#detail-body");
-  details.replaceChildren();
-  $("#review-form").hidden = !item;
-  $("#review-feedback").textContent = "";
-  if (!item) {
-    $("#detail-title").textContent = "لا توجد حالة محددة";
-    $("#detail-priority").textContent = "—";
-    details.append(node("p", "empty", "اختر فترة أخرى أو ملف بيانات آخر."));
-    return;
-  }
-  $("#detail-title").textContent = item.alias;
-  $("#feedback-student").value = item.student_id;
-  const followupSelect = $("#action-followup-id");
-  followupSelect.replaceChildren();
-  for (const followup of item.previous_followups) {
-    const option = node("option", "", `متابعة ${followup.date}`);
-    option.value = followup.id;
-    followupSelect.append(option);
-  }
-  $("#detail-priority").textContent = priorityName(item);
-  $("#detail-priority").className = `priority-tag ${priorityClass(item)}`;
-  const attendance = item.attendance;
-  details.append(block("الحضور خلال الفترة", `${attendance.present} حاضر، ${attendance.absent} غائب، ${attendance.unrecorded} غير مسجل${attendance.missing_record_dates.length ? `، ${attendance.missing_record_dates.length} سجل مفقود` : ""}.`));
-  if (item.alerts.length) details.append(block("المؤشرات المؤكدة", item.alerts.map(signal => {
-    if (signal.type === "absence_in_five_school_days") return `${signal.count} غياب مسجل في نافذة خمسة أيام: ${signal.dates.join("، ")}. المصدر: الحضور.`;
-    return `انخفاض ${subjectName(signal.subject)} من ${signal.previous.percent}% (${signal.previous.date}) إلى ${signal.current.percent}% (${signal.current.date})، بفارق ${signal.drop_percentage_points} نقطة. المصدر: التقييمات.`;
-  })));
-  details.append(block("المتابعة السابقة", item.previous_followups.length ? item.previous_followups.map(followupDescription) : "لا توجد متابعة سابقة حتى نهاية الفترة."));
-  if (item.missing_information.length) details.append(block("معلومات تحتاج تحققًا", item.missing_information.map(info => {
-    if (info.startsWith("Attendance unrecorded on: ")) return `حضور غير مسجل في ${info.split(": ")[1]}`;
-    if (info.startsWith("Attendance row missing on: ")) return `سجل حضور مفقود في ${info.split(": ")[1]}`;
-    return "لا توجد سجلات حضور للطالب في الفترة المختارة";
-  })));
-  if (item.review) details.append(block("قرار مسجل للمراجع", `${decisionName(item.review.decision)} · ${item.review.note}`));
-  $("#review-note").value = "";
-  const params = new URLSearchParams({ data_file: state.dataset, student_id: item.student_id });
-  request(`/api/context?${params}`).then(data => {
-    if (detailVersion !== state.detailVersion || state.selected !== item.student_id || !data.events.length) return;
-    details.append(block("سجل الطالب", data.events.slice(0, 8).map(entry => {
-      if (entry.action === "send_demo") return `${entry.at.slice(0, 10)} · رسالة إلى ${({guardian:"ولي الأمر",student:"الطالب",teacher:"المعلم"})[entry.details.recipient_type]} · ${entry.details.message}`;
-      if (entry.type === "feedback") return `${entry.at.slice(0, 10)} · تقييم: ${({confirmed:"مؤشر صحيح",false_alert:"إنذار غير صحيح",missed_case:"حالة فائتة"})[entry.label] || entry.label} · ${entry.note}`;
-      if (entry.type === "review") return `${entry.at.slice(0, 10)} · قرار مراجعة: ${decisionName(entry.decision)} · ${entry.note}`;
-      if (entry.type === "answer") return `${entry.at.slice(0, 10)} · إجابة: ${entry.answer}`;
-      return `${entry.at.slice(0, 10)} · ${({record_attendance:"تسجيل حضور",resolve_followup:"تحديث متابعة",add_school_day:"إضافة يوم دوام",queue_contact:"طلب تواصل"})[entry.action] || "إجراء متابعة"}`;
-    })));
-  }).catch(() => {});
-}
-
-function decisionName(value) { return ({ verify_data: "التحقق من البيانات", follow_up_approved: "اعتماد خطوة متابعة", no_action: "لا إجراء حاليًا" })[value] || value; }
-
-async function saveReview(event) {
-  event.preventDefault();
-  const feedback = $("#review-feedback");
-  feedback.classList.remove("error");
-  try {
-    await request("/api/reviews", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, student_id: state.selected, decision: $("#decision-select").value, note: $("#review-note").value }) });
-    await loadAnalysis(true);
-    feedback.textContent = "تم حفظ قرار المراجع محليًا. لم يُرسل أي تواصل.";
-  } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
-}
-
 function scrollChatToBottom() {
   const messages = $("#chat-messages");
   messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" });
@@ -274,29 +153,32 @@ function addMessage(text, type) {
 }
 
 
-let questionSequence = 0;
-
 function customChoice(option) {
   return option === "تفصيل آخر" || option.includes("اكتب النتيجة") || option === "تعديل الرسالة";
 }
 
 function disableQuestionCard(card, disabled) {
-  card.panel.querySelectorAll("button, input, textarea").forEach(control => {
+  card.panel.querySelectorAll("button, input").forEach(control => {
     control.disabled = disabled || card.closed;
   });
 }
 
-function settleQuestionCard(card, message) {
-  card.closed = true;
-  card.panel.classList.add("question-settled");
-  disableQuestionCard(card, true);
-  card.panel.append(node("span", "question-status", message));
+function clearQuestion() {
+  state.activeQuestionCard = null;
+  state.question = null;
+  const panel = $("#composer-question");
+  panel.replaceChildren();
+  panel.hidden = true;
+  $("#chat-input").placeholder = "اسأل عن طالب أو حالة…";
+  $("#chat-input").maxLength = 4000;
 }
 
-function renderChoiceCard(box, question, starter = false) {
+function renderChoiceCard(question) {
+  clearQuestion();
   if (!question || !Array.isArray(question.options) || !question.options.length) return;
-  const panel = node("form", "question-panel");
-  const card = { panel, closed: false };
+  const panel = $("#composer-question");
+  panel.hidden = false;
+  const card = { panel, closed: false, selected: null, question };
   const heading = node("div", "question-heading");
   heading.append(node("strong", "", question.text));
   const close = node("button", "question-close", "×");
@@ -305,97 +187,72 @@ function renderChoiceCard(box, question, starter = false) {
   close.setAttribute("aria-label", "إخفاء الخيارات");
   close.addEventListener("click", () => {
     if (state.chatBusy) return;
-    card.closed = true;
-    panel.replaceChildren(node("span", "question-status", "تم إخفاء الخيارات. يمكنك متابعة المحادثة بكتابة رسالتك."));
-    if (state.activeQuestionCard === card) state.activeQuestionCard = null;
+    clearQuestion();
   });
   heading.append(close);
   panel.append(heading);
 
   const choices = node("div", "question-choices");
-  choices.setAttribute("role", "radiogroup");
+  choices.setAttribute("role", "group");
   choices.setAttribute("aria-label", question.text);
-  const group = "chat-question-" + ++questionSequence;
   for (const option of question.options) {
-    const label = node("label", "question-option");
-    const radio = node("input");
-    radio.type = "radio";
-    radio.name = group;
-    radio.value = option;
-    label.append(radio, node("span", "question-choice-text", option));
-    choices.append(label);
+    const button = node("button", "question-option");
+    button.type = "button";
+    button.append(node("span", "question-choice-text", option));
+    button.addEventListener("click", () => {
+      if (state.chatBusy) return;
+      if (!customChoice(option)) {
+        sendChat(option, question.id);
+        return;
+      }
+      card.selected = option;
+      const input = $("#chat-input");
+      input.maxLength = question.id?.startsWith("send:") ? 2000 : 4000;
+      if (option === "تعديل الرسالة") {
+        input.placeholder = "اكتب الرسالة المعدّلة…";
+        input.value = question.draft || "";
+      } else if (option.includes("اكتب النتيجة")) {
+        input.placeholder = "اكتب نتيجة المتابعة…";
+        input.value = "";
+      } else {
+        input.placeholder = "اكتب التفاصيل التي تعرفها…";
+        input.value = "";
+      }
+      input.focus();
+    });
+    choices.append(button);
   }
   panel.append(choices);
-
-  const extra = node("textarea", "question-freeform");
-  extra.rows = 2;
-  extra.maxLength = question.id?.startsWith("send:") ? 2000 : 500;
-  extra.placeholder = "اكتب إجابتك هنا…";
-  extra.setAttribute("aria-label", "اكتب إجابتك");
-  extra.hidden = true;
-  panel.append(extra);
-
-  const actions = node("div", "question-actions");
-  const submit = node("button", "question-submit", starter ? "ابدأ" : "التالي");
-  submit.type = "submit";
-  submit.disabled = true;
-  actions.append(submit);
-  panel.append(actions);
-
-  choices.addEventListener("change", () => {
-    const selected = choices.querySelector("input:checked")?.value;
-    extra.hidden = !selected || !customChoice(selected);
-    extra.required = !extra.hidden;
-    if (selected === "تعديل الرسالة") {
-      extra.placeholder = "اكتب الرسالة المعدّلة…";
-      if (!extra.value) extra.value = question.draft || "";
-    } else if (selected?.includes("اكتب النتيجة")) {
-      extra.placeholder = "اكتب نتيجة المتابعة…";
-    } else {
-      extra.placeholder = "اكتب التفاصيل التي تعرفها…";
-    }
-    submit.textContent = selected === "إرسال الرسالة" ? "إرسال الرسالة" :
-      selected === "نعم، سجّلها" || selected?.startsWith("سجّل") ? "تأكيد التسجيل" :
-      starter ? "ابدأ" : "التالي";
-    submit.disabled = !selected;
-  });
-
-  panel.addEventListener("submit", event => {
-    event.preventDefault();
-    if (state.chatBusy || card.closed) return;
-    const selected = choices.querySelector("input:checked")?.value;
-    if (!selected) return;
-    const typed = customChoice(selected);
-    const message = typed ? extra.value.trim() : selected;
-    if (!message) { extra.focus(); return; }
-    const saveAnswer = typed && (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة");
-    sendChat(message, starter ? null : question.id, saveAnswer);
-  });
-
-  box.append(panel);
   state.activeQuestionCard = card;
-  scrollChatToBottom();
 }
 
-function renderQuestion(box, question) {
-  renderChoiceCard(box, question);
+function submitComposer() {
+  const input = $("#chat-input");
+  const message = input.value.trim();
+  if (!message) { input.focus(); return; }
+  const card = state.activeQuestionCard;
+  const selected = card?.selected;
+  const isAnswer = Boolean(selected && customChoice(selected));
+  const saveAnswer = isAnswer &&
+    (selected.includes("اكتب النتيجة") || selected === "تعديل الرسالة" ||
+      (selected === "تفصيل آخر" && card.question.id?.startsWith("model:")));
+  sendChat(message, isAnswer ? card.question.id : null, saveAnswer);
 }
 
-function showWelcome() {
-  state.activeQuestionCard = null;
+function resetChat() {
+  if (state.chatBusy) return;
+  state.sessionId = null;
+  state.guided = false;
+  clearQuestion();
   $("#chat-messages").replaceChildren();
-  const greeting = addMessage("أهلًا! بقدر أساعدك بمراجعة سجلات الطلاب أو متابعة حالة محددة.", "assistant");
-  renderChoiceCard(greeting, {
-    text: "شو بتحب نراجع أولًا؟",
-    options: ["راجع الحالات في الفترة المحددة", "ما حالة تالا أمجد؟", "اعرض سجلات الحضور غير المسجلة"]
-  }, true);
+  $("#chat-input").value = "";
 }
 
 
 async function sendChat(message, answerTo = null, saveAnswer = false) {
   if (state.chatBusy || !message.trim()) return;
   state.chatBusy = true;
-  $("#chat-form button").disabled = true;
+  $(".composer-input button").disabled = true;
   const previousCard = state.activeQuestionCard;
   if (previousCard) disableQuestionCard(previousCard, true);
   addMessage(message.trim(), "user");
@@ -405,95 +262,26 @@ async function sendChat(message, answerTo = null, saveAnswer = false) {
     const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo, save_answer: saveAnswer }) });
     state.sessionId = data.session_id;
     waiting.querySelector("p").textContent = data.answer;
-    if (previousCard) settleQuestionCard(previousCard, answerTo ? "تم اختيار الإجابة." : "انتهت الخيارات السابقة.");
-    state.activeQuestionCard = null;
+    clearQuestion();
     state.question = data.question;
-    renderQuestion(waiting, data.question);
+    renderChoiceCard(data.question);
     scrollChatToBottom();
-    if (data.changed) await loadAnalysis(true);
+    if (data.changed) await loadAnalysis();
   } catch (error) {
     if (previousCard) disableQuestionCard(previousCard, false);
     waiting.className = "message error";
     waiting.querySelector("p").textContent = error.message;
   } finally {
     state.chatBusy = false;
-    $("#chat-form button").disabled = false;
+    $(".composer-input button").disabled = false;
   }
 }
 
-async function saveFeedback(event) {
-  event.preventDefault();
-  const result = $("#feedback-result");
-  result.classList.remove("error");
-  try {
-    const data = await request("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, student_id: $("#feedback-student").value.trim(), label: $("#feedback-label").value, note: $("#feedback-note").value }) });
-    result.textContent = data.policy_changed ? "حُفظ التقييم وتحدّث أسلوب اختيار الحالات." : "حُفظ التقييم.";
-    $("#feedback-note").value = "";
-    await loadAnalysis(true);
-  } catch (error) { result.textContent = error.message; result.classList.add("error"); }
-}
-
-async function createReport(event) {
-  event.preventDefault();
-  const feedback = $("#report-result");
-  feedback.classList.remove("error");
-  try {
-    const data = await request("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, purpose: $("#report-purpose").value }) });
-    const item = data.report;
-    feedback.textContent = `أُنشئ التقرير لغرض: ${item.purpose}`;
-    const box = $("#report-body");
-    box.replaceChildren(block("الحضور حسب اليوم", item.attendance_by_date.map(day => `${day.date}: ${day.present} حاضر، ${day.absent} غائب، ${day.unrecorded + day.missing_record} دون حضور/غياب محسوم`)));
-    box.append(block("الحالات والبيانات الناقصة", `${item.cases.length} حالات للمراجعة، ${item.missing_attendance.length} سجلات حضور تحتاج استكمالًا.`));
-  } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
-}
-
-function showActionFields() {
-  const kind = $("#action-type").value;
-  $("#action-day-fields").hidden = !["record_attendance", "add_school_day"].includes(kind);
-  $("#action-followup-fields").hidden = kind !== "resolve_followup";
-  $("#action-contact-fields").hidden = kind !== "send_demo";
-  $("#action-status").parentElement.hidden = kind !== "record_attendance";
-}
-
-async function runAction(event) {
-  event.preventDefault();
-  if (state.actionBusy) return;
-  const feedback = $("#action-result");
-  feedback.classList.remove("error");
-  const action = $("#action-type").value;
-  const button = $("#action-form button[type=submit]");
-  try {
-    if (action !== "add_school_day" && !state.selected) throw new Error("اختر الطالب من قائمة الحالات أولًا");
-    const body = { data_file: state.dataset, actor: $("#action-actor").value, action,
-      student_id: state.selected, day: $("#action-day").value, status: $("#action-status").value,
-      followup_id: $("#action-followup-id").value, outcome: $("#action-outcome").value,
-      recipient_type: $("#action-recipient").value, subject: $("#action-subject").value,
-      message: $("#action-message").value };
-    const key = JSON.stringify(body);
-    if (state.actionKey !== key) { state.actionKey = key; state.actionRequestId = crypto.randomUUID(); }
-    body.request_id = state.actionRequestId;
-    state.actionBusy = true;
-    button.disabled = true;
-    const data = await request("/api/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    feedback.textContent = data.action.state === "sent_demo" || data.action.state === "sent" ? "تم الإرسال." : data.action.state === "queued_local" ? "حُفظ طلب التواصل." : ["failed_or_unknown", "sending"].includes(data.action.state) ? "لم يُؤكَّد الإرسال." : "تم حفظ التعديل في سجل الطالب.";
-    state.actionKey = null;
-    state.actionRequestId = null;
-    await loadAnalysis(true);
-  } catch (error) { feedback.textContent = error.message; feedback.classList.add("error"); }
-  finally { state.actionBusy = false; button.disabled = false; }
-}
-
 $("#analyze-btn").addEventListener("click", () => loadAnalysis());
-$("#review-form").addEventListener("submit", saveReview);
-$("#feedback-form").addEventListener("submit", saveFeedback);
-$("#report-form").addEventListener("submit", createReport);
-$("#action-form").addEventListener("submit", runAction);
-$("#action-type").addEventListener("change", showActionFields);
-showActionFields();
-$("#chat-form").addEventListener("submit", event => { event.preventDefault(); sendChat($("#chat-input").value); });
-$("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendChat($("#chat-input").value); } });
-$("#clear-chat").addEventListener("click", () => { state.sessionId = null; state.guided = false; state.question = null; showWelcome(); });
-showWelcome();
+$("#chat-form").addEventListener("submit", event => { event.preventDefault(); submitComposer(); });
+$("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitComposer(); } });
+$("#clear-chat").addEventListener("click", resetChat);
+resetChat();
 refreshStatus();
 setInterval(refreshStatus, 8000);
 setInterval(refreshDataRevision, 8000);
