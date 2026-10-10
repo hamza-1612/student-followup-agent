@@ -129,7 +129,8 @@ function renderReport() {
     copy.append(node("strong", "", item.alias));
     copy.append(node("span", "", item.alerts.length ? item.alerts.map(alertName).join(" · ") : "سجل حضور يحتاج تحققًا"));
     row.append(copy, node("span", `priority-tag ${priorityClass(item)}`, priorityName(item)));
-    row.addEventListener("click", () => sendChat(`ما حالة ${item.alias} وما الخطوة المناسبة؟`));
+    row.setAttribute("aria-label", `عرض سجل ${item.alias}`);
+    row.addEventListener("click", () => openStudentRecord(item));
     list.append(row);
   }
 }
@@ -138,6 +139,110 @@ function priorityClass(item) { return item.priority === "high" ? "high" : item.p
 function priorityName(item) { return item.priority === "high" ? "أولوية عالية" : item.priority === "standard" ? "أولوية عادية" : "تحتاج تحققًا"; }
 function subjectName(value) { return ({ Mathematics: "الرياضيات", Arabic: "اللغة العربية", English: "اللغة الإنجليزية" })[value] || value; }
 function alertName(item) { return item.type === "score_drop" ? `تراجع في ${subjectName(item.subject)}` : "غياب مسجل"; }
+
+function recordSection(title, rows, emptyText) {
+  const section = node("section", "record-section");
+  section.append(node("h3", "", title));
+  if (rows.length) section.append(...rows);
+  else section.append(node("p", "record-empty", emptyText));
+  return section;
+}
+
+function recordDate(value) {
+  const time = node("time", "record-date", value);
+  time.dateTime = value;
+  return time;
+}
+
+function renderStudentRecord(record) {
+  $("#record-title").textContent = record.name;
+  const start = node("bdi", "", record.period.start);
+  const end = node("bdi", "", record.period.end);
+  start.dir = end.dir = "ltr";
+  $("#record-period").replaceChildren("الحضور من ", start, " إلى ", end);
+  const content = $("#record-content");
+  content.replaceChildren();
+
+  if (record.alerts.length) {
+    const signals = node("div", "record-signals");
+    signals.append(node("strong", "", "مؤشرات تستحق المراجعة"));
+    for (const item of record.alerts) {
+      const detail = item.type === "score_drop"
+        ? `تراجع ${subjectName(item.subject)} من ${item.previous.percent}% إلى ${item.current.percent}%`
+        : `${item.count} غياب مسجل: ${item.dates.join("، ")}`;
+      signals.append(node("p", "", detail));
+    }
+    content.append(signals);
+  }
+
+  const statusName = { present: "حاضر", absent: "غائب", unrecorded: "غير مسجل", missing_row: "لا يوجد سجل" };
+  const counts = { present: 0, absent: 0, unrecorded: 0, missing_row: 0 };
+  for (const day of record.attendance) counts[day.status]++;
+  const attendance = node("div", "record-attendance");
+  attendance.append(node("p", "record-counts", `${counts.present} حاضر · ${counts.absent} غائب · ${counts.unrecorded} غير مسجل · ${counts.missing_row} بلا سجل`));
+  const days = node("div", "record-days");
+  for (const day of record.attendance) {
+    const cell = node("div", `record-day status-${day.status}`);
+    cell.append(recordDate(day.date), node("strong", "", statusName[day.status]));
+    days.append(cell);
+  }
+  if (record.attendance.length) attendance.append(days);
+  content.append(recordSection("الحضور خلال الفترة", record.attendance.length ? [attendance] : [], "لا توجد أيام دوام مسجلة في هذه الفترة."));
+
+  const assessments = record.assessments.map(item => {
+    const row = node("div", "record-line");
+    const detail = node("div", "record-line-copy");
+    detail.append(node("strong", "", subjectName(item.subject)), node("span", "", `${item.score} من ${item.max_score} (${item.percent}%)`));
+    row.append(detail, recordDate(item.date));
+    return row;
+  });
+  content.append(recordSection("التقييمات المسجلة حتى نهاية الفترة", assessments, "لا توجد تقييمات مسجلة."));
+
+  const followups = record.followups.map(item => {
+    const row = node("div", "record-line");
+    const detail = node("div", "record-line-copy");
+    detail.append(node("strong", "", item.topic), node("span", "", item.outcome));
+    row.append(detail, recordDate(item.date));
+    return row;
+  });
+  content.append(recordSection("المتابعات السابقة", followups, "لا توجد متابعات سابقة مسجلة."));
+
+  const actionName = { record_attendance: "تعديل حضور", resolve_followup: "تحديث متابعة",
+    send_demo: "رسالة مسجلة", send_email: "بريد إلكتروني", queue_contact: "طلب تواصل", add_school_day: "إضافة يوم دوام" };
+  const actions = record.actions.map(item => {
+    const row = node("div", "record-line");
+    const detail = node("div", "record-line-copy");
+    const info = item.details || {};
+    const description = item.action === "record_attendance" ? `${info.day}: ${statusName[info.after] || info.after}`
+      : item.action === "resolve_followup" ? info.after
+      : item.action === "send_demo" ? info.message
+      : item.action === "send_email" ? `${item.state === "sent" ? "أُرسل" : "لم يتأكد الإرسال"}: ${info.subject || ""}`
+      : info.subject || info.day || "";
+    detail.append(node("strong", "", actionName[item.action] || item.action), node("span", "", description));
+    row.append(detail, recordDate(item.at.slice(0, 10)));
+    return row;
+  });
+  content.append(recordSection("الإجراءات المحلية", actions, "لا توجد إجراءات مسجلة لهذا الطالب."));
+}
+
+async function openStudentRecord(item) {
+  const dialog = $("#student-record");
+  const requestId = state.recordRequest = (state.recordRequest || 0) + 1;
+  $("#record-title").textContent = item.alias;
+  $("#record-period").textContent = "";
+  $("#record-content").replaceChildren(node("p", "record-empty", "جارٍ تحميل سجل الطالب…"));
+  dialog.showModal();
+  try {
+    const params = new URLSearchParams({ data_file: state.dataset, student_id: item.student_id,
+      start: $("#period-start").value, end: $("#period-end").value });
+    const data = await request(`/api/student-record?${params}`);
+    if (dialog.open && requestId === state.recordRequest) renderStudentRecord(data.record);
+  } catch (error) {
+    if (dialog.open && requestId === state.recordRequest) {
+      $("#record-content").replaceChildren(node("p", "record-empty", `تعذّر تحميل السجل: ${error.message}`));
+    }
+  }
+}
 function scrollChatToBottom() {
   const messages = $("#chat-messages");
   messages.scrollTo({ top: messages.scrollHeight, behavior: "smooth" });
@@ -261,7 +366,12 @@ async function sendChat(message, answerTo = null, saveAnswer = false) {
   try {
     const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo, save_answer: saveAnswer }) });
     state.sessionId = data.session_id;
-    waiting.querySelector("p").textContent = data.answer;
+    if (data.reset_chat) {
+      $("#chat-messages").replaceChildren();
+      addMessage(data.answer, "assistant");
+    } else {
+      waiting.querySelector("p").textContent = data.answer;
+    }
     clearQuestion();
     state.question = data.question;
     renderChoiceCard(data.question);
@@ -281,6 +391,8 @@ $("#analyze-btn").addEventListener("click", () => loadAnalysis());
 $("#chat-form").addEventListener("submit", event => { event.preventDefault(); submitComposer(); });
 $("#chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitComposer(); } });
 $("#clear-chat").addEventListener("click", resetChat);
+$("#close-record").addEventListener("click", () => $("#student-record").close());
+$("#student-record").addEventListener("close", () => { state.recordRequest = (state.recordRequest || 0) + 1; });
 resetChat();
 refreshStatus();
 setInterval(refreshStatus, 8000);

@@ -76,6 +76,9 @@ class WebAppTests(unittest.TestCase):
         self.assertIn(b'id="composer-question"', page)
         self.assertIn(b'class="composer-input"', page)
         self.assertIn(b'id="cases-list"', page)
+        self.assertIn(b'id="student-record"', page)
+        self.assertIn(b'openStudentRecord(item)', script)
+        self.assertNotIn('sendChat(`ما حالة'.encode(), script)
         self.assertIn(b'id="chat-messages"', page)
         self.assertIn(b'id="chat-messages" class="chat-messages" aria-live="polite"></div>', page)
         self.assertNotIn('اسأل عن حالة أو اختر خطوة من الحوار'.encode(), page)
@@ -421,6 +424,95 @@ class WebAppTests(unittest.TestCase):
         remaining = json.loads(self.fetch("/api/report", {**context, "purpose": "تقرير الغياب اليومي"})[2])
         self.assertEqual({row["student_id"] for row in remaining["report"]["missing_attendance"]},
                          {"S-022", "S-047"})
+
+    def test_chat_can_reset_one_student_or_all_without_hermes(self):
+        name = "data/fictional_school.json"
+        context = {"data_file": name, "start": "2026-09-07", "end": "2026-09-11"}
+        students = storage.read_data(name)["students"]
+        alias = next(row["alias"] for row in students if row["student_id"] == "S-004")
+        for sid, day in (("S-004", "2026-09-10"), ("S-009", "2026-09-07")):
+            storage_action = {"data_file": name, "action": "record_attendance", "actor": "Teacher",
+                              "student_id": sid, "day": day, "status": "present"}
+            self.assertEqual(self.fetch("/api/actions", storage_action)[0], 200)
+        ambiguous = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح السجلات والإجراءات"})[2])
+        self.assertIn("حدد اسم الطالب", ambiguous["answer"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 2)
+        reset = json.loads(self.fetch("/api/chat", {**context,
+            "message": f"بدي منك تمسح سجل وإجراءات {alias}"})[2])
+        self.assertTrue(reset["changed"])
+        self.assertTrue(reset["reset_chat"])
+        self.assertIsNone(reset["session_id"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 1)
+        self.assertEqual(storage.events("actions.jsonl")[0]["details"]["student_id"], "S-009")
+        status = {(row["student_id"], row["date"]): row["status"]
+                  for row in storage.read_data(name)["attendance"]}
+        self.assertEqual(status["S-004", "2026-09-10"], "unrecorded")
+        self.assertEqual(status["S-009", "2026-09-07"], "present")
+        all_reset = json.loads(self.fetch("/api/chat", {**context,
+            "message": "أريد مسح سجلات وإجراءات كل الطلاب"})[2])
+        self.assertTrue(all_reset["changed"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        self.assertFalse((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())
+
+    def test_student_record_is_read_only_and_keeps_unknown_attendance_distinct(self):
+        name = "data/fictional_school.json"
+        query = urllib.parse.urlencode({"data_file": name, "student_id": "S-006",
+                                        "start": "2026-09-07", "end": "2026-09-11"})
+        status, _, payload = self.fetch("/api/student-record?" + query)
+        self.assertEqual(status, 200)
+        record = json.loads(payload)["record"]
+        self.assertEqual(record["name"], "تالا أمجد")
+        self.assertEqual([day["status"] for day in record["attendance"]].count("absent"), 2)
+        self.assertEqual(record["attendance"][-1]["status"], "unrecorded")
+        self.assertEqual([item["percent"] for item in record["assessments"]], [62, 80])
+        self.assertEqual(record["actions"], [])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        data = storage.read_data(name)
+        data["attendance"] = [row for row in data["attendance"]
+                              if not (row["student_id"] == "S-006" and row["date"] == "2026-09-11")]
+        storage.save_data(name, data)
+        updated = json.loads(self.fetch("/api/student-record?" + query)[2])["record"]
+        self.assertEqual(updated["attendance"][-1]["status"], "missing_row")
+        self.assertEqual(self.fetch("/api/student-record?" + query.replace("S-006", "S-999"))[0], 400)
+
+    def test_chat_clears_only_requested_action_history_with_short_name(self):
+        name = "data/fictional_school.json"
+        context = {"data_file": name, "start": "2026-09-07", "end": "2026-09-11"}
+        for sid, day in (("S-006", "2026-09-11"), ("S-004", "2026-09-10")):
+            action = {"data_file": name, "action": "record_attendance", "actor": "Teacher",
+                      "student_id": sid, "day": day, "status": "present"}
+            self.assertEqual(self.fetch("/api/actions", action)[0], 200)
+        unclear = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح سجل الإجراءات"})[2])
+        self.assertIn("حدد اسم الطالب", unclear["answer"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 2)
+        one = json.loads(self.fetch("/api/chat", {**context,
+            "message": "بدي تمسج سجل الاجراءات لتالا"})[2])
+        self.assertIn("لم أغيّر الحضور", one["answer"])
+        self.assertEqual([row["details"]["student_id"] for row in storage.events("actions.jsonl")], ["S-004"])
+        self.assertEqual(next(row["status"] for row in storage.read_data(name)["attendance"]
+                              if row["student_id"] == "S-006" and row["date"] == "2026-09-11"), "present")
+        all_actions = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح كل إجراءات الطلاب"})[2])
+        self.assertTrue(all_actions["changed"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        self.assertTrue((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())
+
+    def test_chat_clears_action_history_after_greeting(self):
+        name = "data/fictional_school.json"
+        context = {"data_file": name, "start": "2026-09-07", "end": "2026-09-11"}
+        for sid, day in (("S-006", "2026-09-11"), ("S-004", "2026-09-10")):
+            action = {"data_file": name, "action": "record_attendance", "actor": "Teacher",
+                      "student_id": sid, "day": day, "status": "present"}
+            self.assertEqual(self.fetch("/api/actions", action)[0], 200)
+        response = json.loads(self.fetch("/api/chat", {**context,
+            "message": "مرحبا بدي تمسح سجل الاجراءات المحلية لتالا"})[2])
+        self.assertTrue(response["changed"])
+        self.assertIn("مسحت من سجل إجراءات تالا أمجد 1 إجراء محلي", response["answer"])
+        self.assertEqual([row["details"]["student_id"] for row in storage.events("actions.jsonl")], ["S-004"])
+        self.assertEqual(next(row["status"] for row in storage.read_data(name)["attendance"]
+                              if row["student_id"] == "S-006" and row["date"] == "2026-09-11"), "present")
 
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:
