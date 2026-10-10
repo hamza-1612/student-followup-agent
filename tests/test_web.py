@@ -436,7 +436,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("حدد اسم الطالب", ambiguous["answer"])
         self.assertEqual(len(storage.events("actions.jsonl")), 2)
         reset = json.loads(self.fetch("/api/chat", {**context,
-            "message": f"امسح سجل وإجراءات {alias}"})[2])
+            "message": f"بدي منك تمسح سجل وإجراءات {alias}"})[2])
         self.assertTrue(reset["changed"])
         self.assertTrue(reset["reset_chat"])
         self.assertIsNone(reset["session_id"])
@@ -447,7 +447,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(status["S-004", "2026-09-10"], "unrecorded")
         self.assertEqual(status["S-009", "2026-09-07"], "present")
         all_reset = json.loads(self.fetch("/api/chat", {**context,
-            "message": "امسح سجلات وإجراءات كل الطلاب"})[2])
+            "message": "أريد مسح سجلات وإجراءات كل الطلاب"})[2])
         self.assertTrue(all_reset["changed"])
         self.assertEqual(storage.events("actions.jsonl"), [])
         self.assertFalse((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())

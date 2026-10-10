@@ -93,8 +93,8 @@ def page_revision(data_file):
 def reset_target(message, data_file):
     """Recognize only an explicit request to clear both records and actions."""
     request = message.strip()
-    if not re.match(r"^(?:(?:ممكن|لو سمحت|بدي|بديك|أريد|أريدك|اريد)\s+)?"
-                    r"(?:امسح|إمسح|احذف|إحذف|تمسح|تحذف|صفّر|صفر)\b", request):
+    if not re.match(r"^(?:(?:ممكن|لو سمحت|بدي(?: منك)?|بديك|أريد(?: منك)?|أريدك|اريد(?: منك)?)\s+)?"
+                    r"(?:امسح|أمسح|إمسح|احذف|أحذف|إحذف|تمسح|تحذف|مسح|حذف|صفّر|صفر)\b", request):
         return None
     if not re.search(r"(?:سجل|سجلات|بيانات|تغييرات|تغيّرات|إجراءات|اجراءات|اكشنز|أكشنز)", request):
         return None
