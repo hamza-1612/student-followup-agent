@@ -97,8 +97,8 @@ def events(filename):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
-def reset_action_records(data_file, student_id=None):
-    """Restore action-edited demo data and forget matching local action history.
+def reset_action_records(data_file, student_id=None, restore_data=True):
+    """Forget matching local actions, optionally restoring the demo register.
 
     A copy of each changed file is kept under outputs/reset_backups/ so a
     mistaken local reset can be reversed without touching the source fixture.
@@ -118,30 +118,30 @@ def reset_action_records(data_file, student_id=None):
                                       (student_id is None or row.get("details", {}).get("student_id") == student_id))
         removed = [row for row in history if matches_action(row)]
         remaining = [row for row in history if not matches_action(row)]
-        dialogue = events("dialogue.jsonl")
+        dialogue = events("dialogue.jsonl") if restore_data else []
         matches_dialogue = lambda row: (row.get("data_file") == data_file and
                                         (student_id is None or row.get("student_id") == student_id))
         old_answers = [row for row in dialogue if matches_dialogue(row)]
         other_answers = [row for row in dialogue if not matches_dialogue(row)]
-        edited_student = student_id is not None and any(
+        edited_student = restore_data and student_id is not None and any(
             sorted(json.dumps(row, sort_keys=True, ensure_ascii=False) for row in current[section]
                    if row["student_id"] == student_id) !=
             sorted(json.dumps(row, sort_keys=True, ensure_ascii=False) for row in original[section]
                    if row["student_id"] == student_id)
             for section in ("attendance", "followups"))
-        changed = (overlay.exists() if student_id is None else edited_student) or bool(removed or old_answers)
+        changed = ((overlay.exists() if student_id is None else edited_student) if restore_data else False) or bool(removed or old_answers)
         backup = None
         if changed:
             backup = OUTPUT / "reset_backups" / (datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
                                                     + "-" + uuid.uuid4().hex[:8])
             backup.mkdir(parents=True)
-            for path in (overlay, action_log, dialogue_log):
+            for path in ((overlay, action_log, dialogue_log) if restore_data else (action_log,)):
                 if path.exists():
                     target = backup / path.relative_to(OUTPUT)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(path, target)
 
-        if student_id is None:
+        if restore_data and student_id is None:
             overlay.unlink(missing_ok=True)
         elif edited_student:
             for section in ("attendance", "followups"):

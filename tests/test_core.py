@@ -273,6 +273,17 @@ class AnalysisTests(unittest.TestCase):
             with self.assertRaisesRegex(DataError, "الطالب غير موجود"):
                 storage.reset_action_records(name, "S-999")
 
+    def test_clearing_action_log_only_preserves_recorded_attendance(self):
+        name = "data/fictional_school.json"
+        with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)):
+            execute(name, "record_attendance", "Teacher", "S-004", day="2026-09-10", status="present")
+            result = storage.reset_action_records(name, "S-004", restore_data=False)
+            self.assertEqual(result["actions_removed"], 1)
+            self.assertEqual(storage.events("actions.jsonl"), [])
+            self.assertTrue((Path(temp) / "reset_backups" / Path(result["backup"]).name / "actions.jsonl").exists())
+            self.assertEqual(next(row["status"] for row in storage.read_data(name)["attendance"]
+                                  if row["student_id"] == "S-004" and row["date"] == "2026-09-10"), "present")
+
     def test_feedback_only_proposes_rule_change_after_sufficient_labels(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)), \
              patch.object(learning, "OUTPUT", Path(temp)):

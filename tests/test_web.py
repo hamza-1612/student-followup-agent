@@ -476,6 +476,29 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(updated["attendance"][-1]["status"], "missing_row")
         self.assertEqual(self.fetch("/api/student-record?" + query.replace("S-006", "S-999"))[0], 400)
 
+    def test_chat_clears_only_requested_action_history_with_short_name(self):
+        name = "data/fictional_school.json"
+        context = {"data_file": name, "start": "2026-09-07", "end": "2026-09-11"}
+        for sid, day in (("S-006", "2026-09-11"), ("S-004", "2026-09-10")):
+            action = {"data_file": name, "action": "record_attendance", "actor": "Teacher",
+                      "student_id": sid, "day": day, "status": "present"}
+            self.assertEqual(self.fetch("/api/actions", action)[0], 200)
+        unclear = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح سجل الإجراءات"})[2])
+        self.assertIn("حدد اسم الطالب", unclear["answer"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 2)
+        one = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح سجل الإجراءات لتالا"})[2])
+        self.assertIn("لم أغيّر الحضور", one["answer"])
+        self.assertEqual([row["details"]["student_id"] for row in storage.events("actions.jsonl")], ["S-004"])
+        self.assertEqual(next(row["status"] for row in storage.read_data(name)["attendance"]
+                              if row["student_id"] == "S-006" and row["date"] == "2026-09-11"), "present")
+        all_actions = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح كل إجراءات الطلاب"})[2])
+        self.assertTrue(all_actions["changed"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        self.assertTrue((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())
+
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:
             def __init__(self):

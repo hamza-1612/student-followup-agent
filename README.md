@@ -153,6 +153,10 @@ feedback, reports, and unrelated datasets remain as they were. A real email
 already accepted by a mail server cannot be recalled by resetting local records.
 If the request lacks a student name or `كل الطلاب`, the chat asks you to specify
 the scope without deleting anything.
+To clear only the action log, ask `امسح سجل الإجراءات لتالا` or
+`امسح كل إجراءات الطلاب`. A unique first name works; an ambiguous name asks
+for the full name. Action-only clearing leaves attendance and follow-up data
+as recorded and keeps a backup of the removed entries.
 
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers six tools:
