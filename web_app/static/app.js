@@ -156,7 +156,10 @@ function recordDate(value) {
 
 function renderStudentRecord(record) {
   $("#record-title").textContent = record.name;
-  $("#record-period").textContent = `الحضور من ${record.period.start} إلى ${record.period.end}`;
+  const start = node("bdi", "", record.period.start);
+  const end = node("bdi", "", record.period.end);
+  start.dir = end.dir = "ltr";
+  $("#record-period").replaceChildren("الحضور من ", start, " إلى ", end);
   const content = $("#record-content");
   content.replaceChildren();
 
