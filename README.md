@@ -138,6 +138,19 @@ and rename `outputs/` to a backup folder, then restart it. This resets local
 edits and history while preserving the old files in the backup. Do not commit
 `outputs/` or the backup.
 
+In the web chat, you can ask `امسح سجل وإجراءات تالا أمجد` for one student or
+`امسح سجلات وإجراءات كل الطلاب` for the selected dataset. The request restores
+the student's attendance and follow-up changes to the original fictional data
+and removes matching action and recorded answer entries from
+`outputs/actions.jsonl` and `outputs/dialogue.jsonl`; the all-students
+version also removes the dataset's local overlay, including added school days.
+The source file in `data/` is never deleted. Before changing anything, the app
+copies affected local files into `outputs/reset_backups/`. Reviewer decisions,
+feedback, reports, and unrelated datasets remain as they were. A real email
+already accepted by a mail server cannot be recalled by resetting local records.
+If the request lacks a student name or `كل الطلاب`, the chat asks you to specify
+the scope without deleting anything.
+
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers six tools:
 `student_followup_info` finds available JSON datasets, counts students, and

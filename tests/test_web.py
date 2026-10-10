@@ -422,6 +422,36 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual({row["student_id"] for row in remaining["report"]["missing_attendance"]},
                          {"S-022", "S-047"})
 
+    def test_chat_can_reset_one_student_or_all_without_hermes(self):
+        name = "data/fictional_school.json"
+        context = {"data_file": name, "start": "2026-09-07", "end": "2026-09-11"}
+        students = storage.read_data(name)["students"]
+        alias = next(row["alias"] for row in students if row["student_id"] == "S-004")
+        for sid, day in (("S-004", "2026-09-10"), ("S-009", "2026-09-07")):
+            storage_action = {"data_file": name, "action": "record_attendance", "actor": "Teacher",
+                              "student_id": sid, "day": day, "status": "present"}
+            self.assertEqual(self.fetch("/api/actions", storage_action)[0], 200)
+        ambiguous = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح السجلات والإجراءات"})[2])
+        self.assertIn("حدد اسم الطالب", ambiguous["answer"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 2)
+        reset = json.loads(self.fetch("/api/chat", {**context,
+            "message": f"امسح سجل وإجراءات {alias}"})[2])
+        self.assertTrue(reset["changed"])
+        self.assertTrue(reset["reset_chat"])
+        self.assertIsNone(reset["session_id"])
+        self.assertEqual(len(storage.events("actions.jsonl")), 1)
+        self.assertEqual(storage.events("actions.jsonl")[0]["details"]["student_id"], "S-009")
+        status = {(row["student_id"], row["date"]): row["status"]
+                  for row in storage.read_data(name)["attendance"]}
+        self.assertEqual(status["S-004", "2026-09-10"], "unrecorded")
+        self.assertEqual(status["S-009", "2026-09-07"], "present")
+        all_reset = json.loads(self.fetch("/api/chat", {**context,
+            "message": "امسح سجلات وإجراءات كل الطلاب"})[2])
+        self.assertTrue(all_reset["changed"])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        self.assertFalse((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())
+
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:
             def __init__(self):

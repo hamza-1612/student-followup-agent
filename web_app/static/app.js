@@ -261,7 +261,12 @@ async function sendChat(message, answerTo = null, saveAnswer = false) {
   try {
     const data = await request("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, session_id: state.sessionId, guided: state.guided, data_file: state.dataset, start: $("#period-start").value, end: $("#period-end").value, answer_to: answerTo, save_answer: saveAnswer }) });
     state.sessionId = data.session_id;
-    waiting.querySelector("p").textContent = data.answer;
+    if (data.reset_chat) {
+      $("#chat-messages").replaceChildren();
+      addMessage(data.answer, "assistant");
+    } else {
+      waiting.querySelector("p").textContent = data.answer;
+    }
     clearQuestion();
     state.question = data.question;
     renderChoiceCard(data.question);

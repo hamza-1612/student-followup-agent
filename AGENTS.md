@@ -128,3 +128,8 @@ The interface renders the model's choices inside the message composer. For a sep
 only that turn in one to three short Arabic sentences and use tools for any
 explicit action. Do not repeat the whole period, all cases, thresholds or
 token metrics unless requested.
+For a request to clear local student action history, do not claim deletion from
+your own answer: no Hermes tool performs a reset. The web interface handles an
+explicit request naming one student or all students and mentioning both records
+and actions. If the request is unclear, ask for that exact scope. Resetting the
+local demo cannot undo any email already accepted by an external mail server.
