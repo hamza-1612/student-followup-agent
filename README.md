@@ -79,6 +79,9 @@ app does not reach an external person.
 
 The dashboard shows daily attendance, summary counts, and cases. Ask the chat
 for missing records, previous follow-ups, a case explanation, or a next step.
+Click a student in the case list to open a read-only record with daily attendance
+for the selected period, assessments up to its end date, previous follow-ups,
+and local actions. Opening the record does not send a chat message.
 The app runs on your computer at `127.0.0.1`. Its local bridge and
 student analysis use Python's standard library. Chat session state lives in
 the local server process; action and review records persist under `outputs/`.

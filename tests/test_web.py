@@ -76,6 +76,9 @@ class WebAppTests(unittest.TestCase):
         self.assertIn(b'id="composer-question"', page)
         self.assertIn(b'class="composer-input"', page)
         self.assertIn(b'id="cases-list"', page)
+        self.assertIn(b'id="student-record"', page)
+        self.assertIn(b'openStudentRecord(item)', script)
+        self.assertNotIn('sendChat(`ما حالة'.encode(), script)
         self.assertIn(b'id="chat-messages"', page)
         self.assertIn(b'id="chat-messages" class="chat-messages" aria-live="polite"></div>', page)
         self.assertNotIn('اسأل عن حالة أو اختر خطوة من الحوار'.encode(), page)
@@ -451,6 +454,27 @@ class WebAppTests(unittest.TestCase):
         self.assertTrue(all_reset["changed"])
         self.assertEqual(storage.events("actions.jsonl"), [])
         self.assertFalse((Path(self.temp.name) / "datasets" / "fictional_school.json").exists())
+
+    def test_student_record_is_read_only_and_keeps_unknown_attendance_distinct(self):
+        name = "data/fictional_school.json"
+        query = urllib.parse.urlencode({"data_file": name, "student_id": "S-006",
+                                        "start": "2026-09-07", "end": "2026-09-11"})
+        status, _, payload = self.fetch("/api/student-record?" + query)
+        self.assertEqual(status, 200)
+        record = json.loads(payload)["record"]
+        self.assertEqual(record["name"], "تالا أمجد")
+        self.assertEqual([day["status"] for day in record["attendance"]].count("absent"), 2)
+        self.assertEqual(record["attendance"][-1]["status"], "unrecorded")
+        self.assertEqual([item["percent"] for item in record["assessments"]], [62, 80])
+        self.assertEqual(record["actions"], [])
+        self.assertEqual(storage.events("actions.jsonl"), [])
+        data = storage.read_data(name)
+        data["attendance"] = [row for row in data["attendance"]
+                              if not (row["student_id"] == "S-006" and row["date"] == "2026-09-11")]
+        storage.save_data(name, data)
+        updated = json.loads(self.fetch("/api/student-record?" + query)[2])["record"]
+        self.assertEqual(updated["attendance"][-1]["status"], "missing_row")
+        self.assertEqual(self.fetch("/api/student-record?" + query.replace("S-006", "S-999"))[0], 400)
 
     def test_launcher_starts_and_stops_local_gateway(self):
         class Child:

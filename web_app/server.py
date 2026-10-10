@@ -80,6 +80,35 @@ def report(name, start, end):
     return attach_reviews(result, load_latest(REVIEWS, dataset_hash(raw), start, end))
 
 
+def student_record(name, student_id, start, end):
+    """Read the selected student's register without starting a chat turn."""
+    result = report(name, start, end)
+    data = read_data(name)
+    student = next((row for row in data["students"] if row["student_id"] == student_id), None)
+    if student is None:
+        raise DataError("الطالب غير موجود في ملف البيانات")
+    case = next((row for row in result["candidates"] + result["unresolved"]
+                 if row["student_id"] == student_id), None)
+    attendance = {row["date"]: row["status"] for row in data["attendance"]
+                  if row["student_id"] == student_id}
+    days = [row["date"] for row in result["summary"]["attendance"]["by_date"]]
+    assessments = sorted(({
+        "subject": row["subject"], "date": row["date"], "score": row["score"],
+        "max_score": row["max_score"], "percent": round(100 * row["score"] / row["max_score"], 2)}
+        for row in data["assessments"] if row["student_id"] == student_id and row["date"] <= end),
+        key=lambda row: (row["date"], row["subject"]), reverse=True)
+    followups = sorted((row for row in data["followups"]
+                        if row["student_id"] == student_id and row["date"] <= end),
+                       key=lambda row: (row["date"], row["id"]), reverse=True)
+    actions = [row for row in case_context(name, student_id, limit=50) if row["type"] == "action"]
+    return {"student_id": student_id, "name": student["alias"], "period": result["period"],
+            "priority": case["priority"] if case else None,
+            "alerts": case["alerts"] if case else [],
+            "attendance": [{"date": day, "status": attendance.get(day, "missing_row")}
+                           for day in days],
+            "assessments": assessments, "followups": followups, "actions": actions}
+
+
 def page_revision(data_file):
     """A cheap marker for student records and the local decision logs."""
     paths = (storage.active_path(data_file), storage.OUTPUT / "actions.jsonl",
@@ -671,6 +700,10 @@ class Handler(BaseHTTPRequestHandler):
             if route.path == "/api/context":
                 return self._json(200, {"events": case_context(query.get("data_file", [""])[0],
                     query.get("student_id", [None])[0])})
+            if route.path == "/api/student-record":
+                return self._json(200, {"record": student_record(
+                    query.get("data_file", [""])[0], query.get("student_id", [""])[0],
+                    query.get("start", [""])[0], query.get("end", [""])[0])})
             if route.path == "/api/analysis":
                 def required(key):
                     value = query.get(key, [""])[0]
