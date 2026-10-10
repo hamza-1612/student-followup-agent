@@ -80,6 +80,35 @@ def report(name, start, end):
     return attach_reviews(result, load_latest(REVIEWS, dataset_hash(raw), start, end))
 
 
+def student_record(name, student_id, start, end):
+    """Read the selected student's register without starting a chat turn."""
+    result = report(name, start, end)
+    data = read_data(name)
+    student = next((row for row in data["students"] if row["student_id"] == student_id), None)
+    if student is None:
+        raise DataError("الطالب غير موجود في ملف البيانات")
+    case = next((row for row in result["candidates"] + result["unresolved"]
+                 if row["student_id"] == student_id), None)
+    attendance = {row["date"]: row["status"] for row in data["attendance"]
+                  if row["student_id"] == student_id}
+    days = [row["date"] for row in result["summary"]["attendance"]["by_date"]]
+    assessments = sorted(({
+        "subject": row["subject"], "date": row["date"], "score": row["score"],
+        "max_score": row["max_score"], "percent": round(100 * row["score"] / row["max_score"], 2)}
+        for row in data["assessments"] if row["student_id"] == student_id and row["date"] <= end),
+        key=lambda row: (row["date"], row["subject"]), reverse=True)
+    followups = sorted((row for row in data["followups"]
+                        if row["student_id"] == student_id and row["date"] <= end),
+                       key=lambda row: (row["date"], row["id"]), reverse=True)
+    actions = [row for row in case_context(name, student_id, limit=50) if row["type"] == "action"]
+    return {"student_id": student_id, "name": student["alias"], "period": result["period"],
+            "priority": case["priority"] if case else None,
+            "alerts": case["alerts"] if case else [],
+            "attendance": [{"date": day, "status": attendance.get(day, "missing_row")}
+                           for day in days],
+            "assessments": assessments, "followups": followups, "actions": actions}
+
+
 def page_revision(data_file):
     """A cheap marker for student records and the local decision logs."""
     paths = (storage.active_path(data_file), storage.OUTPUT / "actions.jsonl",
@@ -88,6 +117,29 @@ def page_revision(data_file):
         f"{path.stat().st_mtime_ns:x}:{path.stat().st_size:x}" if path.exists() else "0:0"
         for path in paths
     )
+
+
+def reset_target(message, data_file):
+    """Recognize only an explicit request to clear both records and actions."""
+    request = message.strip()
+    if not re.match(r"^(?:(?:ممكن|لو سمحت|بدي(?: منك)?|بديك|أريد(?: منك)?|أريدك|اريد(?: منك)?)\s+)?"
+                    r"(?:امسح|أمسح|إمسح|احذف|أحذف|إحذف|تمسح|تحذف|مسح|حذف|صفّر|صفر)\b", request):
+        return None
+    if not re.search(r"(?:سجل|سجلات|بيانات|تغييرات|تغيّرات|إجراءات|اجراءات|اكشنز|أكشنز)", request):
+        return None
+    if not (re.search(r"(?:سجل|سجلات|بيانات|تغييرات|تغيّرات)", request) and
+            re.search(r"(?:إجراءات|اجراءات|اكشنز|أكشنز)", request)):
+        return {"question": "هل تقصد مسح سجل الطالب وإجراءاته معًا؟ اذكر اسم الطالب، أو قل «كل الطلاب»."}
+    data = read_data(data_file)
+    students = [row for row in data["students"] if row["alias"] in request or
+                re.search(r"(?<![\w-])" + re.escape(row["student_id"]) + r"(?![\w-])", request)]
+    all_students = bool(re.search(r"(?:كل|جميع|كافة)\s+(?:الطلاب|الطالبات|السجلات)|الطلاب\s+كلهم", request))
+    if all_students and students or len(students) > 1:
+        return {"question": "حدد طالبًا واحدًا بالاسم، أو قل «كل الطلاب» من دون أسماء أخرى."}
+    if not all_students and not students:
+        return {"question": "حدد اسم الطالب كما يظهر في القائمة، أو قل «كل الطلاب»."}
+    return {"student_id": None if all_students else students[0]["student_id"],
+            "name": "كل الطلاب" if all_students else students[0]["alias"]}
 
 
 def guided_question(result, answered):
@@ -356,6 +408,21 @@ def chat(message, session_id=None, guided=False, data_file=None, start=None, end
         session = dict(_sessions[known]) if known else None
     if session and session.get("context") != context:
         raise DataError("تغيّر الملف أو الفترة؛ ابدأ محادثة جديدة للمراجعة")
+    target = reset_target(message, data_file) if data_file else None
+    if target:
+        if "question" in target:
+            return {"answer": target["question"], "session_id": known, "question": None}
+        result = storage.reset_action_records(data_file, target["student_id"])
+        with _sessions_lock:
+            for key in list(_sessions):
+                if _sessions[key].get("context", (None,))[0] == data_file:
+                    del _sessions[key]
+        answer = (f"أعدت سجل {target['name']} إلى بيانات العرض الأصلية، ومسحت "
+                  f"{result['actions_removed']} من سجلات الإجراءات المحلية. "
+                  f"حفظت نسخة احتياطية محلية قبل التغيير." if result["changed"] else
+                  f"سجل {target['name']} على حالته الأصلية ولا توجد إجراءات محلية لمسحها.")
+        return {"answer": answer, "session_id": None, "question": None,
+                "changed": result["changed"], "reset_chat": True}
     if behavior_feedback_request(message):
         if not session or not all(context):
             raise DataError("لا توجد محادثة سابقة مرتبطة بحالة لتسجيل الملاحظة")
@@ -633,6 +700,10 @@ class Handler(BaseHTTPRequestHandler):
             if route.path == "/api/context":
                 return self._json(200, {"events": case_context(query.get("data_file", [""])[0],
                     query.get("student_id", [None])[0])})
+            if route.path == "/api/student-record":
+                return self._json(200, {"record": student_record(
+                    query.get("data_file", [""])[0], query.get("student_id", [""])[0],
+                    query.get("start", [""])[0], query.get("end", [""])[0])})
             if route.path == "/api/analysis":
                 def required(key):
                     value = query.get(key, [""])[0]

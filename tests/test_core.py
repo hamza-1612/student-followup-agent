@@ -247,6 +247,32 @@ class AnalysisTests(unittest.TestCase):
                         subject="Check-in", message="Please call school")
             self.assertEqual((ROOT / "data/fictional_school.json").read_bytes(), original)
 
+    def test_reset_student_records_keeps_other_students_and_creates_backup(self):
+        name = "data/fictional_school.json"
+        with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)):
+            execute(name, "record_attendance", "Teacher", "S-004", day="2026-09-10", status="present")
+            execute(name, "record_attendance", "Teacher", "S-009", day="2026-09-07", status="present")
+            execute(name, "resolve_followup", "Teacher", "S-002", followup_id="F-001", outcome="Done")
+            for sid in ("S-004", "S-009"):
+                storage.append_event("dialogue.jsonl", {"data_file": name, "student_id": sid,
+                                     "question_id": "attendance", "answer": "نعم، سجّلها"})
+            reset = storage.reset_action_records(name, "S-004")
+            self.assertEqual(reset["actions_removed"], 1)
+            self.assertTrue((Path(temp) / "reset_backups" / Path(reset["backup"]).name / "actions.jsonl").exists())
+            data = storage.read_data(name)
+            status = {(row["student_id"], row["date"]): row["status"] for row in data["attendance"]}
+            self.assertEqual(status["S-004", "2026-09-10"], "unrecorded")
+            self.assertEqual(status["S-009", "2026-09-07"], "present")
+            self.assertEqual(len(storage.events("actions.jsonl")), 2)
+            self.assertEqual([row["student_id"] for row in storage.events("dialogue.jsonl")], ["S-009"])
+            all_reset = storage.reset_action_records(name)
+            self.assertEqual(all_reset["actions_removed"], 2)
+            self.assertEqual(storage.events("actions.jsonl"), [])
+            self.assertEqual(storage.events("dialogue.jsonl"), [])
+            self.assertEqual(storage.read_data(name), json.loads((ROOT / name).read_text(encoding="utf-8")))
+            with self.assertRaisesRegex(DataError, "الطالب غير موجود"):
+                storage.reset_action_records(name, "S-999")
+
     def test_feedback_only_proposes_rule_change_after_sufficient_labels(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(storage, "OUTPUT", Path(temp)), \
              patch.object(learning, "OUTPUT", Path(temp)):

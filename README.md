@@ -79,6 +79,9 @@ app does not reach an external person.
 
 The dashboard shows daily attendance, summary counts, and cases. Ask the chat
 for missing records, previous follow-ups, a case explanation, or a next step.
+Click a student in the case list to open a read-only record with daily attendance
+for the selected period, assessments up to its end date, previous follow-ups,
+and local actions. Opening the record does not send a chat message.
 The app runs on your computer at `127.0.0.1`. Its local bridge and
 student analysis use Python's standard library. Chat session state lives in
 the local server process; action and review records persist under `outputs/`.
@@ -137,6 +140,19 @@ does not modify Academix. To start with fresh fictional records, stop the app
 and rename `outputs/` to a backup folder, then restart it. This resets local
 edits and history while preserving the old files in the backup. Do not commit
 `outputs/` or the backup.
+
+In the web chat, you can ask `امسح سجل وإجراءات تالا أمجد` for one student or
+`امسح سجلات وإجراءات كل الطلاب` for the selected dataset. The request restores
+the student's attendance and follow-up changes to the original fictional data
+and removes matching action and recorded answer entries from
+`outputs/actions.jsonl` and `outputs/dialogue.jsonl`; the all-students
+version also removes the dataset's local overlay, including added school days.
+The source file in `data/` is never deleted. Before changing anything, the app
+copies affected local files into `outputs/reset_backups/`. Reviewer decisions,
+feedback, reports, and unrelated datasets remain as they were. A real email
+already accepted by a mail server cannot be recalled by resetting local records.
+If the request lacks a student name or `كل الطلاب`, the chat asks you to specify
+the scope without deleting anything.
 
 Hermes selects its configured model/provider; this project does not choose one
 or store credentials. The plugin registers six tools:
