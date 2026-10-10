@@ -123,7 +123,7 @@ def reset_target(message, data_file):
     """Recognize an explicit local action-log clear or full register reset."""
     request = message.strip()
     if not re.match(r"^(?:(?:ممكن|لو سمحت|بدي(?: منك)?|بديك|أريد(?: منك)?|أريدك|اريد(?: منك)?)\s+)?"
-                    r"(?:امسح|أمسح|إمسح|احذف|أحذف|إحذف|تمسح|تحذف|مسح|حذف|صفّر|صفر)\b", request):
+                    r"(?:امسح|أمسح|إمسح|امسج|تمسج|احذف|أحذف|إحذف|تمسح|تحذف|مسح|حذف|صفّر|صفر)\b", request):
         return None
     action_words = r"(?:إجراء(?:ات|اته)?|اجراء(?:ات|اته)?|الأكشنز|الاكشنز|أكشنز|اكشنز)"
     has_actions = bool(re.search(action_words, request))

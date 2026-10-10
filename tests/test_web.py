@@ -488,7 +488,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("حدد اسم الطالب", unclear["answer"])
         self.assertEqual(len(storage.events("actions.jsonl")), 2)
         one = json.loads(self.fetch("/api/chat", {**context,
-            "message": "امسح سجل الإجراءات لتالا"})[2])
+            "message": "بدي تمسج سجل الاجراءات لتالا"})[2])
         self.assertIn("لم أغيّر الحضور", one["answer"])
         self.assertEqual([row["details"]["student_id"] for row in storage.events("actions.jsonl")], ["S-004"])
         self.assertEqual(next(row["status"] for row in storage.read_data(name)["attendance"]
